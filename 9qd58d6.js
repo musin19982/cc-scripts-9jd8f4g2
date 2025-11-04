@@ -14,7 +14,7 @@
    *  🎨 SECCIÓN 1: DISEÑO Y ESTRUCTURA BASE
    **************************************************************************/
   if (!location.href.includes('/gosbilling/user/incidencias/ma-incidencias.xhtml')) return;
-  console.log('%c[Asistente CRM] Iniciado ✅', 'color: lime; font-weight: bold;');
+  console.log('%c[Asistente RECALL] Iniciado ✅', 'color: lime; font-weight: bold;');
 
   // Crear panel principal
   const panel = document.createElement('div');
@@ -42,7 +42,7 @@
       cursor:move;
       user-select:none;
     ">
-      🧭 Asistente CRM
+      🧭 Asistente RECALL
       <button id="cerrar-asistente" style="float:right;border:none;background:none;color:white;cursor:pointer;">✖</button>
     </div>
 
@@ -415,14 +415,14 @@ window.Flujos = window.Flujos || {
   registrar({ id, nombre, tipos, render }) {
     // Validaciones básicas
     if (!id || !nombre || !Array.isArray(tipos) || typeof render !== 'function') {
-      console.warn(`[Asistente CRM] Flujo inválido: ${id || '(sin id)'}`);
+      console.warn(`[Asistente RECALL] Flujo inválido: ${id || '(sin id)'}`);
       return;
     }
 
     // Evitar duplicados
     const existe = this._lista.some(f => f.id === id);
     if (existe) {
-      console.warn(`[Asistente CRM] Flujo duplicado ignorado: ${id}`);
+      console.warn(`[Asistente RECALL] Flujo duplicado ignorado: ${id}`);
       return;
     }
 
@@ -430,7 +430,7 @@ window.Flujos = window.Flujos || {
     const flujo = { id, nombre, tipos, render };
     this._lista.push(flujo);
     this[id] = flujo; // acceso directo (Flujos.bono, Flujos.compromiso, etc.)
-    console.log(`[Asistente CRM] ✅ Flujo registrado: ${nombre} (${id})`);
+    console.log(`[Asistente RECALL] ✅ Flujo registrado: ${nombre} (${id})`);
   },
 
   // Obtener flujos según tipo de abonado y filtro de búsqueda
@@ -491,7 +491,7 @@ function renderMenu(filtro = '') {
 // 🔹 Buscador de flujos
 buscador.addEventListener('input', e => renderMenu(e.target.value));
 
-console.log('%c[Asistente CRM] Sistema de flujos dinámico cargado correctamente', 'color: dodgerblue; font-weight:bold;');
+console.log('%c[Asistente RECALL] Sistema de flujos dinámico cargado correctamente', 'color: dodgerblue; font-weight:bold;');
 
 
 /**************************************************************************
@@ -523,7 +523,7 @@ function actualizarAbonadoSiCambia(forzar = false) {
     abonadoPrevio = nuevo;
     tipoAbonadoActual = detectarTipoAbonado(nuevo);
     window.tipoAbonadoActual = tipoAbonadoActual; // ✅ Exportar al contexto global
-    console.log(`[Asistente CRM] Abonado detectado → ${nuevo} (${tipoAbonadoActual})`);
+    console.log(`[Asistente RECALL] Abonado detectado → ${nuevo} (${tipoAbonadoActual})`);
     renderMenu(buscador.value || '');
   }
 }
@@ -531,7 +531,7 @@ function actualizarAbonadoSiCambia(forzar = false) {
 function iniciarObservadorAbonado() {
   const { contenedor } = obtenerElementoAbonado();
   if (!contenedor) {
-    console.log('[Asistente CRM] Esperando a que se cargue el combo de abonado...');
+    console.log('[Asistente RECALL] Esperando a que se cargue el combo de abonado...');
     setTimeout(iniciarObservadorAbonado, 800);
     return;
   }
@@ -555,7 +555,7 @@ function iniciarObservadorAbonado() {
     if (texto && !texto.toLowerCase().includes('seleccione')) {
       actualizarAbonadoSiCambia(true);
     } else {
-      console.log('[Asistente CRM] Esperando valor real de abonado...');
+      console.log('[Asistente RECALL] Esperando valor real de abonado...');
       setTimeout(esperarValorInicial, 800);
     }
   }
@@ -598,7 +598,7 @@ selectorCategoria.addEventListener('change', e => {
   window.categoriaActual = e.target.value;
   actualizarColorEncabezado(e.target.value);
   renderMenu(buscador.value || '');
-  console.log(`[Asistente CRM] 🔄 Categoría cambiada → ${e.target.value}`);
+  console.log(`[Asistente RECALL] 🔄 Categoría cambiada → ${e.target.value}`);
 });
 
 // 🔹 Función auxiliar: cambia color del encabezado según categoría
@@ -618,21 +618,21 @@ function actualizarColorEncabezado(categoria) {
 const originalRegistrar = Flujos.registrar.bind(Flujos);
 Flujos.registrar = function({ id, nombre, tipos, categorias = ['nueva'], render }) {
   if (!id || !nombre || !Array.isArray(tipos) || typeof render !== 'function') {
-    console.warn(`[Asistente CRM] Flujo inválido: ${id || '(sin id)'}`);
+    console.warn(`[Asistente RECALL] Flujo inválido: ${id || '(sin id)'}`);
     return;
   }
 
   // Evitar duplicados
   const existe = this._lista.some(f => f.id === id);
   if (existe) {
-    console.warn(`[Asistente CRM] Flujo duplicado ignorado: ${id}`);
+    console.warn(`[Asistente RECALL] Flujo duplicado ignorado: ${id}`);
     return;
   }
 
   const flujo = { id, nombre, tipos, categorias, render };
   this._lista.push(flujo);
   this[id] = flujo;
-  console.log(`[Asistente CRM] ✅ Flujo registrado: ${nombre} (${id}) [${categorias.join(', ')}]`);
+  console.log(`[Asistente RECALL] ✅ Flujo registrado: ${nombre} (${id}) [${categorias.join(', ')}]`);
 };
 
 // 🔹 Modificar filtro del renderizado de menú
@@ -900,9 +900,9 @@ Flujos.registrar({
         campoCita.value = fechaFormateada;
         campoCita.dispatchEvent(new Event('input', { bubbles: true }));
         campoCita.dispatchEvent(new Event('change', { bubbles: true }));
-        console.log('[Asistente CRM] Fecha copiada al campo de cita:', fechaFormateada);
+        console.log('[Asistente RECALL] Fecha copiada al campo de cita:', fechaFormateada);
       } else {
-        console.warn('[Asistente CRM] No se encontró el campo de cita.');
+        console.warn('[Asistente RECALL] No se encontró el campo de cita.');
       }
 
         // ✅ Marcar la opción "NO CORTAR" correctamente dentro del widget PrimeFaces
@@ -923,19 +923,19 @@ Flujos.registrar({
                         // Simular clic sobre el label (PrimeFaces escucha esto)
                         label.click();
                         encontrado = true;
-                        console.log('[Asistente CRM] ✅ "NO CORTAR" marcado correctamente (click label).');
+                        console.log('[Asistente RECALL] ✅ "NO CORTAR" marcado correctamente (click label).');
                     } else if (input && input.checked) {
-                        console.log('[Asistente CRM] ℹ️ "NO CORTAR" ya estaba marcado.');
+                        console.log('[Asistente RECALL] ℹ️ "NO CORTAR" ya estaba marcado.');
                         encontrado = true;
                     }
                 }
             });
 
             if (!encontrado) {
-                console.warn('[Asistente CRM] ⚠️ No se encontró la opción "NO CORTAR" en el panel.');
+                console.warn('[Asistente RECALL] ⚠️ No se encontró la opción "NO CORTAR" en el panel.');
             }
         } catch (e) {
-            console.error('[Asistente CRM] ❌ Error al marcar "NO CORTAR":', e);
+            console.error('[Asistente RECALL] ❌ Error al marcar "NO CORTAR":', e);
         }
     });
   }
@@ -1584,7 +1584,7 @@ Flujos.registrar({
         lineaActual = obtenerTextoAbonado()?.trim() || '';
       }
     } catch (e) {
-      console.warn('[Asistente CRM] ⚠️ No se pudo leer la línea actual del abonado.');
+      console.warn('[Asistente RECALL] ⚠️ No se pudo leer la línea actual del abonado.');
     }
 
     inputLinea.value = lineaActual || '(sin línea detectada)';
@@ -1995,7 +1995,7 @@ Flujos.registrar({
           }
         }
       } catch (e) {
-        console.warn('[Asistente CRM] No se pudo marcar la asignación automáticamente:', e);
+        console.warn('[Asistente RECALL] No se pudo marcar la asignación automáticamente:', e);
       }
     });
   }
@@ -2065,17 +2065,17 @@ Flujos.registrar({
             const input = document.getElementById(forAttr);
             if (input && !input.checked) {
               label.click(); // ✅ Simula clic para marcar en PrimeFaces
-              console.log('[Asistente CRM] ✅ Asignación marcada: POLIZAS');
+              console.log('[Asistente RECALL] ✅ Asignación marcada: POLIZAS');
             }
             encontrado = true;
           }
         });
 
         if (!encontrado) {
-          console.warn('[Asistente CRM] ⚠️ No se encontró la asignación "POLIZAS" en el panel.');
+          console.warn('[Asistente RECALL] ⚠️ No se encontró la asignación "POLIZAS" en el panel.');
         }
       } catch (e) {
-        console.error('[Asistente CRM] ❌ Error al marcar la asignación "POLIZAS":', e);
+        console.error('[Asistente RECALL] ❌ Error al marcar la asignación "POLIZAS":', e);
       }
     });
   }
@@ -2194,12 +2194,12 @@ Flujos.registrar({
           });
 
           if (marcadas.length > 0) {
-            console.log(`[Asistente CRM] ✅ Asignaciones automáticas aplicadas: ${marcadas.join(', ')}`);
+            console.log(`[Asistente RECALL] ✅ Asignaciones automáticas aplicadas: ${marcadas.join(', ')}`);
           } else {
-            console.warn('[Asistente CRM] ⚠️ No se encontraron las asignaciones ATC / RESPONSABLE DE RED.');
+            console.warn('[Asistente RECALL] ⚠️ No se encontraron las asignaciones ATC / RESPONSABLE DE RED.');
           }
         } catch (e) {
-          console.error('[Asistente CRM] ❌ Error al aplicar asignaciones automáticas:', e);
+          console.error('[Asistente RECALL] ❌ Error al aplicar asignaciones automáticas:', e);
         }
       }
     });
@@ -2833,12 +2833,12 @@ FORZAR RENDERIZADO
       // Intentamos usar el tipo actual de abonado detectado
       const tipo = window.tipoAbonadoActual || 'administrativo';
       window.Flujos.renderMenu(tipo);
-      console.log('[Asistente CRM] 🔁 Render forzado de menú inicial.');
+      console.log('[Asistente RECALL] 🔁 Render forzado de menú inicial.');
     } else {
-      console.warn('[Asistente CRM] No se pudo forzar el render inicial (Flujos no disponible).');
+      console.warn('[Asistente RECALL] No se pudo forzar el render inicial (Flujos no disponible).');
     }
   } catch (err) {
-    console.error('[Asistente CRM] Error al forzar render inicial:', err);
+    console.error('[Asistente RECALL] Error al forzar render inicial:', err);
   }
 }, 400);
 
