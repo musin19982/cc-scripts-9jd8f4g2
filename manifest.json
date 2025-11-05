@@ -23,7 +23,7 @@
         { "type": "url", "value": "https://nemas.ursotel.es/reservations/check/" },
         { "type": "url", "value": "https://pue-nem1.onlycable.es/reservations/check/" },
         { "type": "url", "value": "https://vlc-nem1.onlycable.es/reservations/check/" },
-        { "type": "url", "value": "https://88.148.51.238/reservations/check" },
+        { "type": "url", "value": "https://arc-nem1.onlycable.es/reservations/check/" },
         { "type": "url", "value": "https://nov-nem1.onlycable.es/reservations/check/" }
       ]
     },
