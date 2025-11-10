@@ -390,7 +390,7 @@ const campoDescripcion =
 function pegarTexto(txt) {
   if (!campoDescripcion) return alert('No se encontró el campo de descripción');
 
-  const agente = window.crmAgente || 'Agente';
+  const agente = window.crmAgente || 'Agente.';
 
   const ahora = new Date();
   const fecha = ahora.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -539,9 +539,19 @@ function iniciarObservadorAbonado() {
   // 👁️ Observar cualquier cambio dentro del contenedor
   const observer = new MutationObserver(() => {
     const texto = obtenerTextoAbonado();
-    if (texto && texto !== abonadoPrevio && !texto.toLowerCase().includes('seleccione')) {
-      actualizarAbonadoSiCambia(true);
-    }
+    if (texto && texto !== abonadoPrevio) {
+  // Si el texto incluye "seleccione", tratamos como administrativo
+  if (texto.toLowerCase().includes('seleccione')) {
+    tipoAbonadoActual = 'administrativo';
+    abonadoPrevio = texto;
+    window.tipoAbonadoActual = tipoAbonadoActual;
+    console.log(`[Asistente RECALL] Abonado → ${texto} (administrativo)`);
+    renderMenu(buscador.value || '');
+  } else {
+    actualizarAbonadoSiCambia(true);
+  }
+}
+
   });
   observer.observe(contenedor, { childList: true, subtree: true });
 
@@ -566,87 +576,56 @@ function iniciarObservadorAbonado() {
 iniciarObservadorAbonado();
 
 /**************************************************************************
- * ⚙️ SISTEMA DE CATEGORÍAS (Nueva / Actualizar / Reclamar)
+ * ⚙️ NUEVO SISTEMA – Todos los flujos visibles + botón rápido Reclama
  **************************************************************************/
 
-// 🔹 Crear selector visual de categoría encima del buscador
-const selectorCategoria = document.createElement('select');
-selectorCategoria.id = 'selectorCategoria';
-selectorCategoria.innerHTML = `
-  <option value="nueva">🆕 Nueva incidencia</option>
-  <option value="actualizar">♻️ Actualizar incidencia</option>
-  <option value="reclamar">📢 Reclama</option>
-`;
-Object.assign(selectorCategoria.style, {
+// 🔹 Todos los flujos disponibles por defecto
+function renderMenu(filtro = '') {
+  Flujos.renderMenu(tipoAbonadoActual, filtro);
+}
+buscador.addEventListener('input', e => renderMenu(e.target.value));
+
+// 🔹 Crear botón de acción "📢 Reclama" en la parte superior del menú lateral
+const btnReclama = document.createElement('button');
+btnReclama.textContent = '📢 Reclama';
+Object.assign(btnReclama.style, {
   width: '95%',
-  padding: '5px',
+  padding: '6px',
   marginBottom: '6px',
   border: '1px solid #ccc',
   borderRadius: '4px',
-  background: '#fff'
+  background: '#fff',
+  color: '#333',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  transition: 'background 0.2s',
+});
+btnReclama.onmouseenter = () => (btnReclama.style.background = '#f0f8ff');
+btnReclama.onmouseleave = () => (btnReclama.style.background = '#fff');
+btnReclama.title = 'Abrir flujo de reclamación';
+
+// Acción al pulsar “📢 Reclama”
+btnReclama.addEventListener('click', () => {
+  const flujoReclama =
+    Flujos.reclama ||
+    Object.values(Flujos._lista).find(f =>
+      f.nombre.toLowerCase().includes('reclama')
+    );
+
+  if (!flujoReclama) {
+    alert('⚠️ No se encontró el flujo de reclamaciones.');
+    return;
+  }
+  flujoReclama.render(menuContenido, pegarTexto);
 });
 
-// Insertar el selector encima del buscador
+// 🔹 Insertarlo justo encima del buscador
 const buscadorFlujos = document.getElementById('buscador-flujos');
-buscadorFlujos.parentNode.insertBefore(selectorCategoria, buscadorFlujos);
+buscadorFlujos.parentNode.insertBefore(btnReclama, buscadorFlujos);
 
-// Estado global actual
-window.categoriaActual = 'nueva';
-
-// 🔹 Reacción al cambiar de categoría
-selectorCategoria.addEventListener('change', e => {
-  window.categoriaActual = e.target.value;
-  actualizarColorEncabezado(e.target.value);
-  renderMenu(buscador.value || '');
-  console.log(`[Asistente RECALL] 🔄 Categoría cambiada → ${e.target.value}`);
-});
-
-// 🔹 Función auxiliar: cambia color del encabezado según categoría
-function actualizarColorEncabezado(categoria) {
-  const header = document.getElementById('asistente-header');
-  if (!header) return;
-
-  const colores = {
-    nueva: '#007bff',       // Azul
-    actualizar: '#28a745',  // Verde
-    reclamar: '#dc3545'     // Rojo
-  };
-  header.style.background = colores[categoria] || '#007bff';
-}
-
-// 🔹 Extensión del sistema de flujos para soportar "categorias"
-const originalRegistrar = Flujos.registrar.bind(Flujos);
-Flujos.registrar = function({ id, nombre, tipos, categorias = ['nueva'], render }) {
-  if (!id || !nombre || !Array.isArray(tipos) || typeof render !== 'function') {
-    console.warn(`[Asistente RECALL] Flujo inválido: ${id || '(sin id)'}`);
-    return;
-  }
-
-  // Evitar duplicados
-  const existe = this._lista.some(f => f.id === id);
-  if (existe) {
-    console.warn(`[Asistente RECALL] Flujo duplicado ignorado: ${id}`);
-    return;
-  }
-
-  const flujo = { id, nombre, tipos, categorias, render };
-  this._lista.push(flujo);
-  this[id] = flujo;
-  console.log(`[Asistente RECALL] ✅ Flujo registrado: ${nombre} (${id}) [${categorias.join(', ')}]`);
-};
-
-// 🔹 Modificar filtro del renderizado de menú
-const originalObtenerPorTipo = Flujos.obtenerPorTipo.bind(Flujos);
-Flujos.obtenerPorTipo = function(tipo, filtro = '', categoria = window.categoriaActual || 'nueva') {
-  return this._lista.filter(f =>
-    f.tipos.includes(tipo) &&
-    f.categorias.includes(categoria) &&
-    f.nombre.toLowerCase().includes(filtro.toLowerCase())
-  );
-};
-
-// Inicializar color correcto en primera carga
-actualizarColorEncabezado(window.categoriaActual);
+// 🔹 Establecer color base del encabezado
+header.style.background = '#007bff';
+renderMenu('');
 
 
 /**************************************************************************
@@ -834,112 +813,221 @@ Flujos.registrar({
 });
 
 /**************************************************************************
- * 🗓️ FLUJO: COMPROMISO DE PAGO (versión final completa)
+ * 🗓️ FLUJO: COMPROMISO DE PAGO (Protocolo cortes automáticos - versión con TC)
  **************************************************************************/
 
 Flujos.registrar({
-  id: 'compromiso',
+  id: 'compromiso_pago_protocolo_final_v3',
   nombre: '🗓️ Compromiso de pago',
   tipos: ['administrativo'],
   render: (contenedor, pegarTexto) => {
+
     contenedor.innerHTML = `
       <h3>🗓️ Compromiso de pago</h3>
 
-      <label><b>Factura(s):</b></label><br>
-      <select id="facturasSelect" multiple size="6" style="width:100%;margin-bottom:8px;">
-        <option>Enero</option><option>Febrero</option><option>Marzo</option>
-        <option>Abril</option><option>Mayo</option><option>Junio</option>
-        <option>Julio</option><option>Agosto</option><option>Septiembre</option>
-        <option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
-      </select>
-      <p style="font-size:11px;color:#555;margin-top:-5px;">Puedes seleccionar varias facturas con Ctrl (Windows) o Cmd (Mac)</p>
-
-      <label><b>Fecha compromiso:</b></label><br>
-      <input id="fechaPago" type="date" style="width:100%;margin-bottom:10px;">
-
-      <button id="generarBtn" style="
-        width:100%;
+      <button id="toggleProtocolo" style="
         background:#007bff;
         color:white;
         border:none;
-        padding:8px;
         border-radius:6px;
+        padding:4px 8px;
         cursor:pointer;
-      ">📝 Generar resultado</button>
+        margin-bottom:8px;
+        font-size:13px;
+      ">📘 Mostrar protocolo</button>
+
+      <div id="bannerProtocolo" style="
+        display:none;
+        background:#eaf3ff;
+        border:1px solid #bcd3ff;
+        padding:10px;
+        border-radius:8px;
+        margin-bottom:10px;
+      ">
+        <b>⚠️ Protocolo de compromisos de pago – Cortes automáticos</b><br><br>
+        Cuando un cliente llama para informar de la fecha en que pagará sus facturas:
+        <ul style="margin:5px 0 0 18px; padding:0;">
+          <li>Si la fecha indicada <b>es anterior</b> a la fecha de corte → se agradece el aviso, no se aplica <b>“No cortar”</b>.</li>
+          <li>Si la fecha indicada <b>es posterior</b> a la fecha de corte → se informa que <b>el sistema no permite registrar</b> compromisos de pago.</li>
+          <li>Solo en caso de <b>fuerza mayor justificada</b> (viaje, hospitalización, etc.) se registrará el compromiso y se aplicará <b>“No cortar”</b>.</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
+        <button id="btnAnterior" style="background:#28a745;color:white;border:none;padding:8px;border-radius:6px;cursor:pointer;">🟩 Previo a fecha corte</button>
+        <button id="btnPosterior" style="background:#dc3545;color:white;border:none;padding:8px;border-radius:6px;cursor:pointer;">🟥 Posterior a fecha corte</button>
+        <button id="btnFuerzaMayor" style="background:#ffc107;color:black;border:none;padding:8px;border-radius:6px;cursor:pointer;">⚠️ Caso de fuerza mayor</button>
+      </div>
+
+      <div id="formPosterior" style="display:none; margin-top:12px;">
+        <hr>
+        <p style="margin-bottom:6px;">¿El cliente no está conforme y debe derivarse a ATC?</p>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+          <input type="checkbox" id="checkDerivo" style="transform:scale(1.2);cursor:pointer;">
+          <label for="checkDerivo" style="cursor:pointer;">Derivar a ATC</label>
+        </div>
+
+        <div id="campoDerivo" style="display:none;">
+          <textarea id="motivoATC" placeholder="Motivo de la derivación..." rows="2"
+            style="width:100%;margin-bottom:8px;resize:vertical;"></textarea>
+
+          <label><b>Teléfono de contacto:</b></label><br>
+          <input id="telefonoATC" type="text" placeholder="Ej: 600123456" style="width:100%;margin-bottom:10px;">
+        </div>
+
+        <button id="generarPosteriorBtn" style="width:100%;background:#007bff;color:white;border:none;padding:8px;border-radius:6px;cursor:pointer;">
+          📝 Generar resultado
+        </button>
+      </div>
+
+      <div id="formFuerzaMayor" style="display:none; margin-top:12px;">
+        <hr>
+        <label><b>Fecha de pago:</b></label><br>
+        <input id="fechaPago" type="date" style="width:100%;margin-bottom:8px;">
+
+        <label><b>Factura(s):</b></label><br>
+        <select id="facturasSelect" multiple size="5" style="width:100%;margin-bottom:8px;">
+          <option>Enero</option><option>Febrero</option><option>Marzo</option>
+          <option>Abril</option><option>Mayo</option><option>Junio</option>
+          <option>Julio</option><option>Agosto</option><option>Septiembre</option>
+          <option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+        </select>
+        <p style="font-size:11px;color:#555;margin-top:-5px;">Puedes seleccionar varias facturas con Ctrl (Windows) o Cmd (Mac)</p>
+
+        <label><b>Motivo de fuerza mayor:</b></label><br>
+        <textarea id="motivo" rows="3" style="width:100%;margin-bottom:8px;resize:vertical;"></textarea>
+
+        <button id="generarFuerzaBtn" style="width:100%;background:#007bff;color:white;border:none;padding:8px;border-radius:6px;cursor:pointer;">
+          📝 Generar resultado
+        </button>
+      </div>
     `;
 
-    const facturasSel = contenedor.querySelector('#facturasSelect');
-    const fechaInput = contenedor.querySelector('#fechaPago');
-    const btn = contenedor.querySelector('#generarBtn');
+    // ---- ELEMENTOS ----
+    const toggle = contenedor.querySelector('#toggleProtocolo');
+    const banner = contenedor.querySelector('#bannerProtocolo');
+    const btnAnterior = contenedor.querySelector('#btnAnterior');
+    const btnPosterior = contenedor.querySelector('#btnPosterior');
+    const btnFuerza = contenedor.querySelector('#btnFuerzaMayor');
+    const formPosterior = contenedor.querySelector('#formPosterior');
+    const formFuerza = contenedor.querySelector('#formFuerzaMayor');
+    const generarPosterior = contenedor.querySelector('#generarPosteriorBtn');
+    const generarFuerza = contenedor.querySelector('#generarFuerzaBtn');
+    const checkDerivo = contenedor.querySelector('#checkDerivo');
+    const campoDerivo = contenedor.querySelector('#campoDerivo');
+    const motivoATC = contenedor.querySelector('#motivoATC');
+    const telefonoATC = contenedor.querySelector('#telefonoATC');
 
-    btn.addEventListener('click', () => {
-      const facturas = [...facturasSel.selectedOptions].map(o => o.text).join(', ') || 'no especificadas';
-      const fecha = fechaInput.value;
+    // ---- Mostrar / ocultar protocolo ----
+    toggle.addEventListener('click', () => {
+      const abierto = banner.style.display === 'block';
+      banner.style.display = abierto ? 'none' : 'block';
+      toggle.textContent = abierto ? '📘 Mostrar protocolo' : '📘 Ocultar protocolo';
+    });
 
-      if (!fecha) {
-        alert('⚠️ Debes indicar una fecha de compromiso de pago.');
+    // ---- Utilidad: cerrar otros formularios ----
+    const cerrarOtros = (excepto) => {
+      if (excepto !== 'posterior') formPosterior.style.display = 'none';
+      if (excepto !== 'fuerza') formFuerza.style.display = 'none';
+    };
+
+    // ---- Caso A: previo a corte ----
+    btnAnterior.addEventListener('click', () => {
+      cerrarOtros();
+      const texto = `Cliente llama para informar del día en que pagará sus facturas. Dado que la fecha indicada es previa a la fecha de corte, se agradece el aviso y no se aplica el protocolo de “No cortar”.`;
+      pegarTexto(texto.trim());
+      alert('✅ Resultado generado (previo a fecha de corte).');
+    });
+
+    // ---- Caso B: posterior a corte ----
+    btnPosterior.addEventListener('click', () => {
+      const visible = formPosterior.style.display === 'block';
+      cerrarOtros(visible ? null : 'posterior');
+      formPosterior.style.display = visible ? 'none' : 'block';
+    });
+
+    checkDerivo.addEventListener('change', () => {
+      campoDerivo.style.display = checkDerivo.checked ? 'block' : 'none';
+    });
+
+    generarPosterior.addEventListener('click', () => {
+      if (checkDerivo.checked) {
+        const motivo = motivoATC.value.trim();
+        const telefono = telefonoATC.value.trim();
+        if (!motivo) {
+          alert('⚠️ Debes indicar el motivo de la derivación a ATC.');
+          return;
+        }
+        if (!telefono) {
+          alert('⚠️ Debes indicar el teléfono de contacto del cliente.');
+          return;
+        }
+      }
+
+      let texto = `Cliente llama para informar del día en que pagará sus facturas. Dado que la fecha indicada es posterior a la fecha de corte, se le informa de que el sistema no permite registrar compromisos de pago. Se le indica que debe abonar antes del día de corte para evitar la suspensión automática del servicio.`;
+      if (checkDerivo.checked) {
+        const motivo = motivoATC.value.trim();
+        const telefono = telefonoATC.value.trim();
+        texto += ` Se deriva a ATC por el siguiente motivo: ${motivo}. TC: ${telefono}.`;
+      }
+
+      pegarTexto(texto.trim());
+      alert('✅ Resultado generado (posterior a fecha de corte).');
+    });
+
+    // ---- Caso C: fuerza mayor ----
+    btnFuerza.addEventListener('click', () => {
+      const visible = formFuerza.style.display === 'block';
+      cerrarOtros(visible ? null : 'fuerza');
+      formFuerza.style.display = visible ? 'none' : 'block';
+    });
+
+    generarFuerza.addEventListener('click', () => {
+      const fecha = contenedor.querySelector('#fechaPago').value;
+      const facturas = [...contenedor.querySelector('#facturasSelect').selectedOptions].map(o => o.text).join(', ') || 'no especificadas';
+      const motivo = contenedor.querySelector('#motivo').value.trim();
+
+      if (!fecha || !motivo) {
+        alert('⚠️ Debes indicar la fecha de pago y el motivo de fuerza mayor.');
         return;
       }
 
-      // Formatear fecha como dd/mm/aaaa
-      const partes = fecha.split('-');
-      const fechaFormateada = `${partes[2]}/${partes[1]}/${partes[0]}`;
+      const [yyyy, mm, dd] = fecha.split('-');
+      const fechaFormateada = `${dd}/${mm}/${yyyy}`;
 
-      // Texto a pegar
-      const texto = `Cliente pagará el ${fechaFormateada} la(s) siguiente(s) factura(s): ${facturas}.`;
+      const texto = `Compromiso por fuerza mayor: ${motivo}. Cliente indica que realizará el pago el ${fechaFormateada} correspondiente a la(s) factura(s): ${facturas}. Se registra el compromiso y se asigna “No cortar” hasta dicha fecha.`;
       pegarTexto(texto.trim());
 
-      // ✅ Copiar al campo de cita del CRM
-      // ✅ Versión robusta (sin ID variable, detecta input de cita/fecha en formIncidencia)
+      try {
         const campoCita = document.querySelector(
-            'input[name*="formIncidencia"][class*="ui-inputfield"][class*="datepicker"], ' +
-            'input[name*="formIncidencia"][class*="ui-inputfield"][class*="hasDatepicker"], ' +
-            'input[name*="formIncidencia"][class*="ui-inputfield"][type="text"]:not([aria-expanded])'
+          'input[name*="formIncidencia"][class*="ui-inputfield"][class*="datepicker"], ' +
+          'input[name*="formIncidencia"][class*="ui-inputfield"][class*="hasDatepicker"], ' +
+          'input[name*="formIncidencia"][class*="ui-inputfield"][type="text"]:not([aria-expanded])'
         );
-      if (campoCita) {
-        campoCita.value = fechaFormateada;
-        campoCita.dispatchEvent(new Event('input', { bubbles: true }));
-        campoCita.dispatchEvent(new Event('change', { bubbles: true }));
-        console.log('[Asistente RECALL] Fecha copiada al campo de cita:', fechaFormateada);
-      } else {
-        console.warn('[Asistente RECALL] No se encontró el campo de cita.');
+        if (campoCita) {
+          campoCita.value = fechaFormateada;
+          campoCita.dispatchEvent(new Event('input', { bubbles: true }));
+          campoCita.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        const panel = document.querySelector('div[id*="multipleAsignaciones_panel"]');
+        if (panel) {
+          const labels = panel.querySelectorAll('label');
+          labels.forEach(label => {
+            if (label.textContent.trim().toUpperCase() === 'NO CORTAR') label.click();
+          });
+        }
+      } catch (e) {
+        console.warn('[Asistente RECALL] No se pudo marcar “NO CORTAR” automáticamente:', e);
       }
 
-        // ✅ Marcar la opción "NO CORTAR" correctamente dentro del widget PrimeFaces
-        try {
-            const panel = document.querySelector('div[id*="multipleAsignaciones_panel"]');
-            if (!panel) throw new Error('No se encontró el panel de asignaciones');
-
-            // Buscar todas las etiquetas label dentro del panel
-            const labels = panel.querySelectorAll('label');
-            let encontrado = false;
-
-            labels.forEach(label => {
-                const texto = label.textContent.trim().toUpperCase();
-                if (texto === 'NO CORTAR') {
-                    const forAttr = label.getAttribute('for');
-                    const input = document.getElementById(forAttr);
-                    if (input && !input.checked) {
-                        // Simular clic sobre el label (PrimeFaces escucha esto)
-                        label.click();
-                        encontrado = true;
-                        console.log('[Asistente RECALL] ✅ "NO CORTAR" marcado correctamente (click label).');
-                    } else if (input && input.checked) {
-                        console.log('[Asistente RECALL] ℹ️ "NO CORTAR" ya estaba marcado.');
-                        encontrado = true;
-                    }
-                }
-            });
-
-            if (!encontrado) {
-                console.warn('[Asistente RECALL] ⚠️ No se encontró la opción "NO CORTAR" en el panel.');
-            }
-        } catch (e) {
-            console.error('[Asistente RECALL] ❌ Error al marcar "NO CORTAR":', e);
-        }
+      alert('✅ Compromiso por fuerza mayor registrado.');
     });
   }
 });
+
+
+
 
 /**************************************************************************
  * 🔁 FLUJO: CAMBIO COMPROMISO DE PAGO (misma estructura visual que "Compromiso de pago")
@@ -2639,8 +2727,10 @@ Flujos.registrar({
       <select id="tipoGestion" style="width:100%;margin-bottom:10px;">
         <option value="inicio">Inicio gestión</option>
         <option value="seguimiento">Seguimiento</option>
+        <option value="derivada">Derivada (otro departamento)</option>
       </select>
 
+      <!-- BLOQUE INICIO / DERIVADA -->
       <div id="bloqueInicio">
         <label><b>Tipo de incidencia:</b></label><br>
         <select id="tipoIncidencia" style="width:100%;margin-bottom:10px;">
@@ -2653,7 +2743,7 @@ Flujos.registrar({
           <option value="Otro">Otro</option>
         </select>
 
-        <label><b>Descripción:</b></label><br>
+        <label id="labelDescripcion"><b>Descripción:</b></label><br>
         <textarea id="descripcion" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
 
         <label><b>Niveles / Equipos:</b></label><br>
@@ -2663,8 +2753,9 @@ Flujos.registrar({
         <textarea id="pruebas" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
       </div>
 
+      <!-- BLOQUE SEGUIMIENTO -->
       <div id="bloqueSeguimiento" style="display:none;">
-        <label><b>Información adicional:</b></label><br>
+        <label><b>Información adicional (opcional):</b></label><br>
         <textarea id="infoAdicional" rows="4" style="width:100%;margin-bottom:10px;"></textarea>
       </div>
 
@@ -2674,6 +2765,8 @@ Flujos.registrar({
         <option value="pendiente">Pendiente comprobación</option>
         <option value="noLocalizado">No localizado</option>
         <option value="derivaTecnicos">Se deriva a técnicos</option>
+        <option value="ingenieria">Se deriva a ingeniería</option>
+        <option value="sinProblema">No tiene problemas con el servicio</option>
       </select>
 
       <!-- 🕓 Subbloques dinámicos -->
@@ -2703,7 +2796,14 @@ Flujos.registrar({
           <option value="Cliente no colabora">Cliente no colabora</option>
           <option value="Cliente no se aclara">Cliente no se aclara</option>
           <option value="Problema físico">Problema físico</option>
+          <option value="Cliente exige visita técnica">Cliente exige visita técnica</option>
+          <option value="Otro">Otro</option>
         </select>
+
+        <div id="bloqueMotivoOtro" style="display:none;margin-left:10px;">
+          <label>Motivo (especificar):</label>
+          <input id="motivoOtro" type="text" style="width:100%;margin-bottom:8px;" placeholder="Indica el motivo">
+        </div>
 
         <label><b>Teléfono de contacto:</b></label><br>
         <input id="telefonoDeriva" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. 612345678">
@@ -2740,6 +2840,9 @@ Flujos.registrar({
     const bloqueDeriva = contenedor.querySelector('#bloqueDeriva');
     const motivoDeriva = contenedor.querySelector('#motivoDeriva');
     const telefonoDeriva = contenedor.querySelector('#telefonoDeriva');
+    const motivoOtro = contenedor.querySelector('#motivoOtro');
+    const bloqueMotivoOtro = contenedor.querySelector('#bloqueMotivoOtro');
+    const labelDescripcion = contenedor.querySelector('#labelDescripcion');
     const btn = contenedor.querySelector('#generarBtn');
 
     // --- Inicializar fecha por defecto ---
@@ -2749,9 +2852,39 @@ Flujos.registrar({
 
     // --- Mostrar/ocultar según tipo gestión ---
     tipoGestion.addEventListener('change', () => {
-      const esInicio = tipoGestion.value === 'inicio';
-      bloqueInicio.style.display = esInicio ? 'block' : 'none';
-      bloqueSeguimiento.style.display = esInicio ? 'none' : 'block';
+      const tipo = tipoGestion.value;
+      bloqueInicio.style.display = tipo === 'inicio' || tipo === 'derivada' ? 'block' : 'none';
+      bloqueSeguimiento.style.display = tipo === 'seguimiento' ? 'block' : 'none';
+
+      // Cambiar etiqueta del campo descripción según tipo
+      if (tipo === 'derivada') {
+        labelDescripcion.innerHTML = '<b>Información adicional (opcional):</b>';
+      } else {
+        labelDescripcion.innerHTML = '<b>Descripción:</b>';
+      }
+
+      // 🔄 Añadir o eliminar la opción "Cierre incidencia, no localizado tras varios intentos"
+      const existeOpcion = Array.from(resultado.options).some(opt => opt.value === 'noLocalizadoVarios');
+      if (tipo === 'seguimiento' && !existeOpcion) {
+        const nuevaOpcion = document.createElement('option');
+        nuevaOpcion.value = 'noLocalizadoVarios';
+        nuevaOpcion.textContent = 'Cierre incidencia, no localizado tras varios intentos';
+
+        // Insertar justo después de "No localizado"
+        const opcionNoLocalizado = Array.from(resultado.options).find(opt => opt.value === 'noLocalizado');
+        if (opcionNoLocalizado && opcionNoLocalizado.nextSibling) {
+          resultado.insertBefore(nuevaOpcion, opcionNoLocalizado.nextSibling);
+        } else {
+          resultado.appendChild(nuevaOpcion);
+        }
+      } else if (tipo !== 'seguimiento' && existeOpcion) {
+        const opcion = Array.from(resultado.options).find(opt => opt.value === 'noLocalizadoVarios');
+        if (opcion) {
+          // Si estaba seleccionada, reiniciamos el valor
+          if (resultado.value === 'noLocalizadoVarios') resultado.value = 'si';
+          opcion.remove();
+        }
+      }
     });
 
     // --- Mostrar subbloques según selección ---
@@ -2766,6 +2899,11 @@ Flujos.registrar({
       bloqueCita.style.display = detallePendiente.value === 'seCita' ? 'block' : 'none';
     });
 
+    // --- Mostrar campo "Otro" ---
+    motivoDeriva.addEventListener('change', () => {
+      bloqueMotivoOtro.style.display = motivoDeriva.value === 'Otro' ? 'block' : 'none';
+    });
+
     // --- Generar resultado ---
     btn.addEventListener('click', () => {
       const gestion = tipoGestion.value;
@@ -2777,17 +2915,486 @@ Flujos.registrar({
         const desc = descripcion.value.trim() || 'no especificada';
         const niv = niveles.value.trim() || 'no indicado';
         const pru = pruebas.value.trim() || 'no indicadas';
-
         texto = `Inicio gestión incidencia Internet. Tipo: ${tipo}. Descripción: ${desc}. Niveles/Equipos: ${niv}. Pruebas realizadas: ${pru}. `;
       }
 
-      // --- Seguimiento ---
-      if (gestion === 'seguimiento') {
-        const info = infoAdicional.value.trim() || 'sin información adicional';
-        texto = `Seguimiento incidencia Internet. Información adicional: ${info}. `;
+      // --- Derivada ---
+      if (gestion === 'derivada') {
+        const tipo = tipoIncidencia.value;
+        const desc = descripcion.value.trim();
+        const niv = niveles.value.trim() || 'no indicado';
+        const pru = pruebas.value.trim() || 'no indicadas';
+        texto = `Gestión derivada de otro departamento. Tipo: ${tipo}. `;
+        if (desc) texto += `Información adicional: ${desc}. `;
+        texto += `Niveles/Equipos: ${niv}. Pruebas realizadas: ${pru}. `;
       }
 
+      // --- Seguimiento ---
+        if (gestion === 'seguimiento') {
+            const info = infoAdicional.value.trim();
+            if (info) {
+                texto = `Seguimiento incidencia Internet. Información adicional: ${info}. `;
+            } else {
+                texto = `Seguimiento incidencia Internet. `;
+            }
+        }
+
+
+
       // --- Resultado final ---
+      switch (resultado.value) {
+        case 'si':
+          texto += 'Se soluciona.';
+          break;
+
+        case 'pendiente':
+          if (detallePendiente.value === 'seCita') {
+            if (!horaCita.value) {
+              alert('⚠️ Debes indicar la hora de la cita.');
+              return;
+            }
+            const [yyyy, mm, dd] = fechaCita.value.split('-');
+            texto += `Pendiente comprobación: se cita el ${dd}/${mm}/${yyyy} a las ${horaCita.value}.`;
+          } else {
+            texto += 'Pendiente comprobación: el cliente nos avisará cuando pueda.';
+          }
+          break;
+
+        case 'noLocalizado':
+          texto += whatsapp.checked ? 'No localizado, se envía WhatsApp.' : 'No localizado.';
+          break;
+
+        case 'noLocalizadoVarios':
+          texto += 'Cierre incidencia: no localizado tras varios intentos.';
+          break;
+
+        case 'derivaTecnicos':
+          const tel = telefonoDeriva.value.trim();
+          if (!tel) {
+            alert('⚠️ Debes indicar un teléfono de contacto.');
+            return;
+          }
+          if (motivoDeriva.value === 'Otro' && !motivoOtro.value.trim()) {
+            alert('⚠️ Debes especificar el motivo de derivación.');
+            return;
+          }
+          const motivo = motivoDeriva.value === 'Otro'
+            ? motivoOtro.value.trim()
+            : motivoDeriva.value;
+          texto += `Se deriva a técnicos. Motivo: ${motivo}. TC: ${tel}.`;
+          break;
+
+        case 'ingenieria':
+          texto += 'Se deriva a ingeniería para revisión.';
+          break;
+
+        case 'sinProblema':
+          texto += 'No se detectan problemas con el servicio.';
+          break;
+      }
+
+      pegarTexto(texto.trim());
+    });
+  }
+});
+
+
+
+/**************************************************************************
+ * 🌐 Flujo: Fibrablanca Community (Internet) — Categorías: nueva, actualizar
+ **************************************************************************/
+Flujos.registrar({
+  id: 'fibrablanca-community',
+  nombre: 'Fibrablanca Community',
+  tipos: ['internet'],
+  categorias: ['nueva', 'actualizar'],
+
+  render(contenedor, pegarTexto) {
+    contenedor.innerHTML = `
+      <h3 style="margin-bottom:8px;">🌐 Fibrablanca Community</h3>
+
+      <label>Nº OT (obligatorio):</label>
+      <input id="fb-ot" type="text" style="width:100%;margin-bottom:6px;" required>
+
+      <label>Instalación YMO:</label>
+      <select id="fb-ymo" style="width:100%;margin-bottom:6px;">
+        <option selected>NO</option>
+        <option>SI</option>
+      </select>
+
+      <label>Teléfono fijo servicio (opcional):</label>
+      <input id="fb-fijo" type="text" style="width:100%;margin-bottom:6px;">
+
+      <label>Teléfono móvil de contacto (obligatorio):</label>
+      <input id="fb-movil" type="text" style="width:100%;margin-bottom:6px;" required>
+
+      <label>Nombre de contacto (obligatorio):</label>
+      <input id="fb-nombre" type="text" style="width:100%;margin-bottom:6px;" required>
+
+      <label>Horario de contacto para pruebas (opcional):</label>
+      <input id="fb-horario" type="text" style="width:100%;margin-bottom:6px;">
+
+      <label>Información adicional:</label>
+      <textarea id="fb-info" style="width:100%;height:60px;margin-bottom:6px;">Se realiza diagnóstico en Schaman.</textarea>
+
+      <fieldset style="border:1px solid #ccc;border-radius:6px;padding:6px;margin-bottom:8px;">
+        <legend>💡 Luces router</legend>
+
+        <label>PWR / POWER:</label>
+        <select id="fb-pwr" style="width:100%;margin-bottom:4px;">
+          <option selected>Verde</option>
+          <option>Apagado</option>
+        </select>
+
+        <label>PON / DSL / WAN:</label>
+        <select id="fb-pon" style="width:100%;margin-bottom:4px;">
+          <option>Encendido</option>
+          <option selected>Apagado</option>
+        </select>
+
+        <label>LOS:</label>
+        <select id="fb-los" style="width:100%;margin-bottom:4px;">
+          <option>Verde</option>
+          <option selected>Rojo</option>
+          <option>Apagado</option>
+        </select>
+
+        <label>INTERNET / @:</label>
+        <select id="fb-internet" style="width:100%;margin-bottom:4px;">
+          <option>Encendido</option>
+          <option selected>Apagado</option>
+        </select>
+      </fieldset>
+
+      <fieldset style="border:1px solid #ccc;border-radius:6px;padding:6px;margin-bottom:8px;">
+        <legend>⚙️ Diagnóstico</legend>
+
+        <label>¿Router enciende?</label>
+        <select id="fb-router" style="width:100%;margin-bottom:4px;">
+          <option selected>SI</option>
+          <option>NO</option>
+        </select>
+
+        <label>¿Reinicio del router?</label>
+        <select id="fb-reinicio" style="width:100%;margin-bottom:4px;">
+          <option selected>SI</option>
+          <option>NO</option>
+        </select>
+
+        <label>¿Reset de palillo?</label>
+        <select id="fb-reset" style="width:100%;margin-bottom:4px;">
+          <option>SI</option>
+          <option selected>NO</option>
+        </select>
+
+        <label>¿Apagado 15 min router y ONT?</label>
+        <select id="fb-apagado" style="width:100%;margin-bottom:4px;">
+          <option selected>SI</option>
+          <option>NO</option>
+        </select>
+
+        <label>Comprobación de cableado:</label>
+        <textarea id="fb-cableado" style="width:100%;height:40px;">Todo OK</textarea>
+      </fieldset>
+
+      <button id="fb-generar" style="
+        width:100%;
+        background:#007bff;
+        color:white;
+        border:none;
+        padding:8px;
+        font-weight:bold;
+        border-radius:6px;
+        cursor:pointer;
+      ">📋 Copiar resultado Community</button>
+    `;
+
+    // Añadimos la función del botón
+    contenedor.querySelector('#fb-generar').addEventListener('click', () => {
+      // Campos
+      const ot = document.getElementById('fb-ot').value.trim();
+      const fijo = document.getElementById('fb-fijo').value.trim();
+      const movil = document.getElementById('fb-movil').value.trim();
+      const nombre = document.getElementById('fb-nombre').value.trim();
+      const horario = document.getElementById('fb-horario').value.trim();
+      const info = document.getElementById('fb-info').value.trim();
+      const pwr = document.getElementById('fb-pwr').value.trim();
+      const pon = document.getElementById('fb-pon').value.trim();
+      const los = document.getElementById('fb-los').value.trim();
+      const internet = document.getElementById('fb-internet').value.trim();
+      const router = document.getElementById('fb-router').value.trim();
+      const reinicio = document.getElementById('fb-reinicio').value.trim();
+      const reset = document.getElementById('fb-reset').value.trim();
+      const apagado = document.getElementById('fb-apagado').value.trim();
+      const cableado = document.getElementById('fb-cableado').value.trim();
+
+      // Validaciones mínimas
+      if (!ot || !movil || !nombre) {
+        alert('⚠️ Faltan campos obligatorios: Nº OT, Teléfono móvil y Nombre de contacto.');
+        return;
+      }
+
+      // Construcción del texto
+      const resultado =
+`Nº OT: ${ot}
+Instalación YMO: NO
+Teléfono fijo servicio: ${fijo}
+Teléfono móvil de contacto: ${movil}
+Nombre de contacto: ${nombre}
+Horario de contacto para pruebas en domicilio: ${horario}
+Información adicional: ${info}
+
+Motivo avería: Incomunicado
+Luces router (según modelo)
+- PWR/POWER: ${pwr}
+- PON/DSL/WAN: ${pon}
+- LOS / ! : ${los}
+- INTERNET/@: ${internet}
+Descripcion del problema:
+Router enciende: ${router}
+Reinicio del router: ${reinicio}
+Reset de palillo: ${reset}
+Apagado de 15 min de router y ONT: ${apagado}
+Comprobacion de cableado: ${cableado}`;
+
+      // Copiar al portapapeles
+      navigator.clipboard.writeText(resultado).then(() => {
+        alert('📋 Resultado copiado al portapapeles (Community).');
+      }).catch(() => {
+        alert('⚠️ No se pudo copiar automáticamente. Copia manualmente el texto.');
+      });
+
+      // Opcional: también pegar en el CRM
+      pegarTexto(resultado);
+    });
+  }
+});
+
+/**************************************************************************
+ * 📺 FLUJO: INCIDENCIA SERVICIO (TELEVISIÓN / ZAPI)
+ **************************************************************************/
+
+Flujos.registrar({
+  id: 'incidenciaServicioTelevision',
+  nombre: '📺 Incidencia servicio (Televisión)',
+  tipos: ['television', 'zapi'],
+  render: (contenedor, pegarTexto) => {
+    contenedor.innerHTML = `
+      <h3>📺 Incidencia servicio (Televisión)</h3>
+
+      <label><b>Gestión:</b></label><br>
+      <select id="tipoGestion" style="width:100%;margin-bottom:10px;">
+        <option value="inicio">Inicio gestión</option>
+        <option value="seguimiento">Seguimiento</option>
+        <option value="derivada">Derivada (otro departamento)</option>
+      </select>
+
+      <!-- BLOQUE INICIO GESTIÓN -->
+      <div id="bloqueInicio">
+        <label><b>Descripción:</b></label><br>
+        <textarea id="descripcion" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Niveles / Equipos:</b></label><br>
+        <textarea id="niveles" rows="2" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>CATV (opcional):</b></label><br>
+        <input id="catv" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. 0012345678">
+
+        <label><b>Pruebas realizadas:</b></label><br>
+        <textarea id="pruebas" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+      </div>
+
+      <!-- BLOQUE SEGUIMIENTO -->
+      <div id="bloqueSeguimiento" style="display:none;">
+        <label><b>Información adicional (opcional):</b></label><br>
+        <textarea id="infoAdicional" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+      </div>
+
+      <!-- BLOQUE DERIVADA -->
+      <div id="bloqueDerivada" style="display:none;">
+        <label><b>Información adicional (opcional):</b></label><br>
+        <textarea id="infoAdicionalDerivada" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Niveles / Equipos:</b></label><br>
+        <textarea id="nivelesDerivada" rows="2" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>CATV (opcional):</b></label><br>
+        <input id="catvDerivada" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. 0012345678">
+
+        <label><b>Pruebas realizadas:</b></label><br>
+        <textarea id="pruebasDerivada" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+      </div>
+
+      <!-- RESULTADO -->
+      <label><b>¿Se soluciona la incidencia?</b></label><br>
+      <select id="resultado" style="width:100%;margin-bottom:10px;">
+        <option value="si">Sí</option>
+        <option value="pendiente">Pendiente comprobación</option>
+        <option value="noLocalizado">No localizado</option>
+        <option value="derivaTecnicos">Se deriva a técnicos</option>
+        <option value="derivaIngenieria">Se deriva a ingeniería</option>
+        <option value="noProblema">No tiene problemas con el servicio</option>
+      </select>
+
+      <!-- SUBBLOQUES -->
+      <div id="bloquePendiente" style="display:none;margin-left:10px;">
+        <label><b>Detalle:</b></label><br>
+        <select id="detallePendiente" style="width:100%;margin-bottom:10px;">
+          <option value="seCita">Se cita</option>
+          <option value="avisara">Nos avisará cuando pueda</option>
+        </select>
+
+        <div id="bloqueCita" style="display:none;margin-left:10px;">
+          <label>📅 Fecha de cita:</label>
+          <input id="fechaCita" type="date" style="width:100%;margin-bottom:6px;">
+          <label>🕒 Hora de cita:</label>
+          <input id="horaCita" type="time" style="width:100%;margin-bottom:10px;">
+        </div>
+      </div>
+
+      <div id="bloqueNoLocalizado" style="display:none;margin-left:10px;">
+        <label><input type="checkbox" id="whatsapp"> Se envía WhatsApp</label><br>
+        <div id="cierreIntentos" style="display:none;margin-top:4px;">
+          <label><input type="checkbox" id="cierreNoLocalizado"> Cierre incidencia, no localizado tras varios intentos</label>
+        </div>
+      </div>
+
+      <div id="bloqueDerivaTecnicos" style="display:none;margin-left:10px;">
+        <label><b>Motivo de derivación:</b></label><br>
+        <select id="motivoDeriva" style="width:100%;margin-bottom:8px;">
+          <option value="Tras pruebas realizadas no se soluciona">Tras pruebas realizadas no se soluciona</option>
+          <option value="Cliente no colabora">Cliente no colabora</option>
+          <option value="Cliente no se aclara">Cliente no se aclara</option>
+          <option value="Problema físico">Problema físico</option>
+          <option value="Cliente exige visita técnica">Cliente exige visita técnica</option>
+          <option value="Otro">Otro</option>
+        </select>
+
+        <div id="bloqueMotivoOtro" style="display:none;">
+          <label><b>Especificar motivo:</b></label><br>
+          <input id="motivoOtro" type="text" style="width:100%;margin-bottom:8px;">
+        </div>
+
+        <label><b>Teléfono de contacto:</b></label><br>
+        <input id="telefonoDeriva" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. 612345678">
+      </div>
+
+      <div id="bloqueIngenieria" style="display:none;margin-left:10px;">
+        <label><input type="checkbox" id="checkMonitorizacion"> Se comprueba monitorización</label>
+        <div id="bloqueMonitorizacion" style="display:none;margin-top:6px;margin-left:10px;">
+          <label><input type="radio" name="monitorizacion" value="ok"> Se ve bien en monitorización</label><br>
+          <label><input type="radio" name="monitorizacion" value="falla"> Ocurre el mismo problema en la monitorización</label>
+        </div>
+      </div>
+
+      <button id="generarBtn" style="
+        width:100%;
+        background:#007bff;
+        color:white;
+        border:none;
+        padding:8px;
+        border-radius:6px;
+        cursor:pointer;
+      ">📝 Generar resultado</button>
+    `;
+
+    // Referencias
+    const tipoGestion = contenedor.querySelector('#tipoGestion');
+    const bloqueInicio = contenedor.querySelector('#bloqueInicio');
+    const bloqueSeguimiento = contenedor.querySelector('#bloqueSeguimiento');
+    const bloqueDerivada = contenedor.querySelector('#bloqueDerivada');
+    const descripcion = contenedor.querySelector('#descripcion');
+    const niveles = contenedor.querySelector('#niveles');
+    const catv = contenedor.querySelector('#catv');
+    const pruebas = contenedor.querySelector('#pruebas');
+    const infoAdicional = contenedor.querySelector('#infoAdicional');
+    const infoAdicionalDerivada = contenedor.querySelector('#infoAdicionalDerivada');
+    const nivelesDerivada = contenedor.querySelector('#nivelesDerivada');
+    const catvDerivada = contenedor.querySelector('#catvDerivada');
+    const pruebasDerivada = contenedor.querySelector('#pruebasDerivada');
+    const resultado = contenedor.querySelector('#resultado');
+    const detallePendiente = contenedor.querySelector('#detallePendiente');
+    const bloquePendiente = contenedor.querySelector('#bloquePendiente');
+    const bloqueCita = contenedor.querySelector('#bloqueCita');
+    const fechaCita = contenedor.querySelector('#fechaCita');
+    const horaCita = contenedor.querySelector('#horaCita');
+    const bloqueNoLocalizado = contenedor.querySelector('#bloqueNoLocalizado');
+    const whatsapp = contenedor.querySelector('#whatsapp');
+    const cierreNoLocalizado = contenedor.querySelector('#cierreNoLocalizado');
+    const bloqueDerivaTecnicos = contenedor.querySelector('#bloqueDerivaTecnicos');
+    const motivoDeriva = contenedor.querySelector('#motivoDeriva');
+    const bloqueMotivoOtro = contenedor.querySelector('#bloqueMotivoOtro');
+    const motivoOtro = contenedor.querySelector('#motivoOtro');
+    const telefonoDeriva = contenedor.querySelector('#telefonoDeriva');
+    const bloqueIngenieria = contenedor.querySelector('#bloqueIngenieria');
+    const checkMonitorizacion = contenedor.querySelector('#checkMonitorizacion');
+    const bloqueMonitorizacion = contenedor.querySelector('#bloqueMonitorizacion');
+    const btn = contenedor.querySelector('#generarBtn');
+
+    // Fecha de hoy por defecto
+    const hoy = new Date();
+    fechaCita.value = hoy.toISOString().split('T')[0];
+
+    // Mostrar/ocultar bloques según gestión
+    tipoGestion.addEventListener('change', () => {
+      bloqueInicio.style.display = tipoGestion.value === 'inicio' ? 'block' : 'none';
+      bloqueSeguimiento.style.display = tipoGestion.value === 'seguimiento' ? 'block' : 'none';
+      bloqueDerivada.style.display = tipoGestion.value === 'derivada' ? 'block' : 'none';
+    });
+
+    // Subbloques dinámicos
+    resultado.addEventListener('change', () => {
+      bloquePendiente.style.display = resultado.value === 'pendiente' ? 'block' : 'none';
+      bloqueNoLocalizado.style.display = resultado.value === 'noLocalizado' ? 'block' : 'none';
+      bloqueDerivaTecnicos.style.display = resultado.value === 'derivaTecnicos' ? 'block' : 'none';
+      bloqueIngenieria.style.display = resultado.value === 'derivaIngenieria' ? 'block' : 'none';
+    });
+
+    detallePendiente.addEventListener('change', () => {
+      bloqueCita.style.display = detallePendiente.value === 'seCita' ? 'block' : 'none';
+    });
+
+    motivoDeriva.addEventListener('change', () => {
+      bloqueMotivoOtro.style.display = motivoDeriva.value === 'Otro' ? 'block' : 'none';
+    });
+
+    checkMonitorizacion.addEventListener('change', () => {
+      bloqueMonitorizacion.style.display = checkMonitorizacion.checked ? 'block' : 'none';
+    });
+
+    // Generar resultado
+    btn.addEventListener('click', () => {
+      const gestion = tipoGestion.value;
+      let texto = '';
+
+      if (gestion === 'inicio') {
+        const desc = descripcion.value.trim();
+        const niv = niveles.value.trim();
+        const pruebasTxt = pruebas.value.trim();
+        const catvTxt = catv.value.trim();
+        if (!desc || !pruebasTxt) {
+          alert('⚠️ Debes completar descripción y pruebas realizadas.');
+          return;
+        }
+        texto = `Inicio gestión incidencia Televisión. Descripción: ${desc}. Niveles/Equipos: ${niv || 'no indicado'}. `;
+        if (catvTxt) texto += `CATV: ${catvTxt}. `;
+        texto += `Pruebas realizadas: ${pruebasTxt}. `;
+      }
+
+      if (gestion === 'seguimiento') {
+        const info = infoAdicional.value.trim();
+        texto = info ? `Seguimiento incidencia Televisión. Información adicional: ${info}. ` : `Seguimiento incidencia Televisión. `;
+      }
+
+      if (gestion === 'derivada') {
+        const desc = infoAdicionalDerivada.value.trim();
+        const niv = nivelesDerivada.value.trim();
+        const pruebasTxt = pruebasDerivada.value.trim();
+        texto = `Derivada desde otro departamento. Información adicional: ${desc || 'sin detalles'}. Niveles/Equipos: ${niv || 'no indicado'}. Pruebas: ${pruebasTxt || 'no indicadas'}. `;
+        const catvTxt = catvDerivada.value.trim();
+        if (catvTxt) texto += `CATV: ${catvTxt}. `;
+      }
+
       switch (resultado.value) {
         case 'si':
           texto += 'Se soluciona.';
@@ -2806,6 +3413,7 @@ Flujos.registrar({
           break;
         case 'noLocalizado':
           texto += whatsapp.checked ? 'No localizado, se envía WhatsApp.' : 'No localizado.';
+          if (cierreNoLocalizado.checked) texto += ' Cierre incidencia, no localizado tras varios intentos.';
           break;
         case 'derivaTecnicos':
           const tel = telefonoDeriva.value.trim();
@@ -2813,7 +3421,282 @@ Flujos.registrar({
             alert('⚠️ Debes indicar un teléfono de contacto.');
             return;
           }
-          texto += `Se deriva a técnicos. Motivo: ${motivoDeriva.value}. TC: ${tel}.`;
+          if (motivoDeriva.value === 'Otro' && !motivoOtro.value.trim()) {
+            alert('⚠️ Debes especificar el motivo de derivación.');
+            return;
+          }
+          texto += `Se deriva a técnicos. Motivo: ${motivoDeriva.value === 'Otro' ? motivoOtro.value : motivoDeriva.value}. TC: ${tel}.`;
+          break;
+        case 'derivaIngenieria':
+          texto += 'Se deriva a ingeniería.';
+          if (checkMonitorizacion.checked) {
+            const seleccion = contenedor.querySelector('input[name="monitorizacion"]:checked');
+            if (seleccion) {
+              texto += ` Monitorización: ${seleccion.value === 'ok' ? 'se ve bien' : 'ocurre el mismo problema'}.`;
+            }
+          }
+          break;
+        case 'noProblema':
+          texto += 'No tiene problemas con el servicio.';
+          break;
+      }
+
+      pegarTexto(texto.trim());
+    });
+  }
+});
+
+/**************************************************************************
+ * ☎️ FLUJO: INCIDENCIA SERVICIO (FIJO)
+ **************************************************************************/
+
+Flujos.registrar({
+  id: 'incidenciaServicioFijo',
+  nombre: '☎️ Incidencia servicio (Fijo)',
+  tipos: ['fijo'],
+  render: (contenedor, pegarTexto) => {
+    contenedor.innerHTML = `
+      <h3>☎️ Incidencia servicio (Fijo)</h3>
+
+      <label><b>Gestión:</b></label><br>
+      <select id="tipoGestion" style="width:100%;margin-bottom:10px;">
+        <option value="inicio">Inicio gestión</option>
+        <option value="seguimiento">Seguimiento</option>
+        <option value="derivada">Derivada (otro departamento)</option>
+      </select>
+
+      <!-- BLOQUE INICIO GESTIÓN -->
+      <div id="bloqueInicio">
+        <label><b>Descripción:</b></label><br>
+        <textarea id="descripcion" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Niveles / Equipos:</b></label><br>
+        <textarea id="niveles" rows="2" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Pruebas realizadas:</b></label><br>
+        <textarea id="pruebas" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+      </div>
+
+      <!-- BLOQUE SEGUIMIENTO -->
+      <div id="bloqueSeguimiento" style="display:none;">
+        <label><b>Información adicional (opcional):</b></label><br>
+        <textarea id="infoAdicional" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+      </div>
+
+      <!-- BLOQUE DERIVADA -->
+      <div id="bloqueDerivada" style="display:none;">
+        <label><b>Información adicional (opcional):</b></label><br>
+        <textarea id="infoAdicionalDerivada" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Niveles / Equipos:</b></label><br>
+        <textarea id="nivelesDerivada" rows="2" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Pruebas realizadas:</b></label><br>
+        <textarea id="pruebasDerivada" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+      </div>
+
+      <!-- RESULTADO -->
+      <label><b>¿Se soluciona la incidencia?</b></label><br>
+      <select id="resultado" style="width:100%;margin-bottom:10px;">
+        <option value="si">Sí</option>
+        <option value="pendiente">Pendiente comprobación</option>
+        <option value="noLocalizado">No localizado</option>
+        <option value="derivaTecnicos">Se deriva a técnicos</option>
+        <option value="derivaIngenieria">Se deriva a ingeniería</option>
+        <option value="noProblema">No tiene problemas con el servicio</option>
+      </select>
+
+      <!-- SUBBLOQUES -->
+      <div id="bloquePendiente" style="display:none;margin-left:10px;">
+        <label><b>Detalle:</b></label><br>
+        <select id="detallePendiente" style="width:100%;margin-bottom:10px;">
+          <option value="seCita">Se cita</option>
+          <option value="avisara">Nos avisará cuando pueda</option>
+        </select>
+
+        <div id="bloqueCita" style="display:none;margin-left:10px;">
+          <label>📅 Fecha de cita:</label>
+          <input id="fechaCita" type="date" style="width:100%;margin-bottom:6px;">
+          <label>🕒 Hora de cita:</label>
+          <input id="horaCita" type="time" style="width:100%;margin-bottom:10px;">
+        </div>
+      </div>
+
+      <div id="bloqueNoLocalizado" style="display:none;margin-left:10px;">
+        <label><input type="checkbox" id="whatsapp"> Se envía WhatsApp</label><br>
+        <div id="cierreIntentos" style="display:none;margin-top:4px;">
+          <label><input type="checkbox" id="cierreNoLocalizado"> Cierre incidencia, no localizado tras varios intentos</label>
+        </div>
+      </div>
+
+      <div id="bloqueDerivaTecnicos" style="display:none;margin-left:10px;">
+        <label><b>Motivo de derivación:</b></label><br>
+        <select id="motivoDeriva" style="width:100%;margin-bottom:8px;">
+          <option value="Tras pruebas realizadas no se soluciona">Tras pruebas realizadas no se soluciona</option>
+          <option value="Cliente no colabora">Cliente no colabora</option>
+          <option value="Cliente no se aclara">Cliente no se aclara</option>
+          <option value="Problema físico">Problema físico</option>
+          <option value="Cliente exige visita técnica">Cliente exige visita técnica</option>
+          <option value="Otro">Otro</option>
+        </select>
+
+        <div id="bloqueMotivoOtro" style="display:none;">
+          <label><b>Especificar motivo:</b></label><br>
+          <input id="motivoOtro" type="text" style="width:100%;margin-bottom:8px;">
+        </div>
+
+        <label><b>Teléfono de contacto:</b></label><br>
+        <input id="telefonoDeriva" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. 612345678">
+      </div>
+
+      <div id="bloqueIngenieria" style="display:none;margin-left:10px;">
+        <label><input type="checkbox" id="checkMonitorizacion"> Se comprueba monitorización</label>
+        <div id="bloqueMonitorizacion" style="display:none;margin-top:6px;margin-left:10px;">
+          <label><input type="radio" name="monitorizacion" value="ok"> Se ve bien en monitorización</label><br>
+          <label><input type="radio" name="monitorizacion" value="falla"> Ocurre el mismo problema en la monitorización</label>
+        </div>
+      </div>
+
+      <button id="generarBtn" style="
+        width:100%;
+        background:#007bff;
+        color:white;
+        border:none;
+        padding:8px;
+        border-radius:6px;
+        cursor:pointer;
+      ">📝 Generar resultado</button>
+    `;
+
+    // Referencias
+    const tipoGestion = contenedor.querySelector('#tipoGestion');
+    const bloqueInicio = contenedor.querySelector('#bloqueInicio');
+    const bloqueSeguimiento = contenedor.querySelector('#bloqueSeguimiento');
+    const bloqueDerivada = contenedor.querySelector('#bloqueDerivada');
+    const descripcion = contenedor.querySelector('#descripcion');
+    const niveles = contenedor.querySelector('#niveles');
+    const pruebas = contenedor.querySelector('#pruebas');
+    const infoAdicional = contenedor.querySelector('#infoAdicional');
+    const infoAdicionalDerivada = contenedor.querySelector('#infoAdicionalDerivada');
+    const nivelesDerivada = contenedor.querySelector('#nivelesDerivada');
+    const pruebasDerivada = contenedor.querySelector('#pruebasDerivada');
+    const resultado = contenedor.querySelector('#resultado');
+    const detallePendiente = contenedor.querySelector('#detallePendiente');
+    const bloquePendiente = contenedor.querySelector('#bloquePendiente');
+    const bloqueCita = contenedor.querySelector('#bloqueCita');
+    const fechaCita = contenedor.querySelector('#fechaCita');
+    const horaCita = contenedor.querySelector('#horaCita');
+    const bloqueNoLocalizado = contenedor.querySelector('#bloqueNoLocalizado');
+    const whatsapp = contenedor.querySelector('#whatsapp');
+    const cierreNoLocalizado = contenedor.querySelector('#cierreNoLocalizado');
+    const bloqueDerivaTecnicos = contenedor.querySelector('#bloqueDerivaTecnicos');
+    const motivoDeriva = contenedor.querySelector('#motivoDeriva');
+    const bloqueMotivoOtro = contenedor.querySelector('#bloqueMotivoOtro');
+    const motivoOtro = contenedor.querySelector('#motivoOtro');
+    const telefonoDeriva = contenedor.querySelector('#telefonoDeriva');
+    const bloqueIngenieria = contenedor.querySelector('#bloqueIngenieria');
+    const checkMonitorizacion = contenedor.querySelector('#checkMonitorizacion');
+    const bloqueMonitorizacion = contenedor.querySelector('#bloqueMonitorizacion');
+    const btn = contenedor.querySelector('#generarBtn');
+
+    const hoy = new Date();
+    fechaCita.value = hoy.toISOString().split('T')[0];
+
+    tipoGestion.addEventListener('change', () => {
+      bloqueInicio.style.display = tipoGestion.value === 'inicio' ? 'block' : 'none';
+      bloqueSeguimiento.style.display = tipoGestion.value === 'seguimiento' ? 'block' : 'none';
+      bloqueDerivada.style.display = tipoGestion.value === 'derivada' ? 'block' : 'none';
+    });
+
+    resultado.addEventListener('change', () => {
+      bloquePendiente.style.display = resultado.value === 'pendiente' ? 'block' : 'none';
+      bloqueNoLocalizado.style.display = resultado.value === 'noLocalizado' ? 'block' : 'none';
+      bloqueDerivaTecnicos.style.display = resultado.value === 'derivaTecnicos' ? 'block' : 'none';
+      bloqueIngenieria.style.display = resultado.value === 'derivaIngenieria' ? 'block' : 'none';
+    });
+
+    detallePendiente.addEventListener('change', () => {
+      bloqueCita.style.display = detallePendiente.value === 'seCita' ? 'block' : 'none';
+    });
+
+    motivoDeriva.addEventListener('change', () => {
+      bloqueMotivoOtro.style.display = motivoDeriva.value === 'Otro' ? 'block' : 'none';
+    });
+
+    checkMonitorizacion.addEventListener('change', () => {
+      bloqueMonitorizacion.style.display = checkMonitorizacion.checked ? 'block' : 'none';
+    });
+
+    btn.addEventListener('click', () => {
+      const gestion = tipoGestion.value;
+      let texto = '';
+
+      if (gestion === 'inicio') {
+        const desc = descripcion.value.trim();
+        const niv = niveles.value.trim();
+        const pru = pruebas.value.trim();
+        if (!desc || !pru) {
+          alert('⚠️ Debes completar descripción y pruebas realizadas.');
+          return;
+        }
+        texto = `Inicio gestión incidencia Fijo. Descripción: ${desc}. Niveles/Equipos: ${niv || 'no indicado'}. Pruebas realizadas: ${pru}. `;
+      }
+
+      if (gestion === 'seguimiento') {
+        const info = infoAdicional.value.trim();
+        texto = info ? `Seguimiento incidencia Fijo. Información adicional: ${info}. ` : `Seguimiento incidencia Fijo. `;
+      }
+
+      if (gestion === 'derivada') {
+        const desc = infoAdicionalDerivada.value.trim();
+        const niv = nivelesDerivada.value.trim();
+        const pru = pruebasDerivada.value.trim();
+        texto = `Derivada desde otro departamento. Información adicional: ${desc || 'sin detalles'}. Niveles/Equipos: ${niv || 'no indicado'}. Pruebas: ${pru || 'no indicadas'}. `;
+      }
+
+      switch (resultado.value) {
+        case 'si':
+          texto += 'Se soluciona.';
+          break;
+        case 'pendiente':
+          if (detallePendiente.value === 'seCita') {
+            if (!horaCita.value) {
+              alert('⚠️ Debes indicar la hora de la cita.');
+              return;
+            }
+            const [yyyy, mm, dd] = fechaCita.value.split('-');
+            texto += `Pendiente comprobación: se cita el ${dd}/${mm}/${yyyy} a las ${horaCita.value}.`;
+          } else {
+            texto += 'Pendiente comprobación: el cliente nos avisará cuando pueda.';
+          }
+          break;
+        case 'noLocalizado':
+          texto += whatsapp.checked ? 'No localizado, se envía WhatsApp.' : 'No localizado.';
+          if (cierreNoLocalizado.checked) texto += ' Cierre incidencia, no localizado tras varios intentos.';
+          break;
+        case 'derivaTecnicos':
+          const tel = telefonoDeriva.value.trim();
+          if (!tel) {
+            alert('⚠️ Debes indicar un teléfono de contacto.');
+            return;
+          }
+          if (motivoDeriva.value === 'Otro' && !motivoOtro.value.trim()) {
+            alert('⚠️ Debes especificar el motivo de derivación.');
+            return;
+          }
+          texto += `Se deriva a técnicos. Motivo: ${motivoDeriva.value === 'Otro' ? motivoOtro.value : motivoDeriva.value}. TC: ${tel}.`;
+          break;
+        case 'derivaIngenieria':
+          texto += 'Se deriva a ingeniería.';
+          if (checkMonitorizacion.checked) {
+            const seleccion = contenedor.querySelector('input[name="monitorizacion"]:checked');
+            if (seleccion) {
+              texto += ` Monitorización: ${seleccion.value === 'ok' ? 'se ve bien' : 'ocurre el mismo problema'}.`;
+            }
+          }
+          break;
+        case 'noProblema':
+          texto += 'No tiene problemas con el servicio.';
           break;
       }
 
