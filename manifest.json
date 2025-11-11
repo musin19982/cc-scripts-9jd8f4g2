@@ -1,5 +1,5 @@
 {
-  "version": "2025-11-10-01",
+  "version": "2025-11-11-01",
   "scripts": [
     {
       "file": "x82c9e4a.js",
@@ -49,6 +49,12 @@
       "file": "1c2v3f6d.js",
       "match": [
         { "type": "url", "value": "https://amr.onlycable.es/tablas/canalesTv/alarmas" }
+      ]
+    },
+    {
+      "file": "u8f7ehd8.js",
+      "match": [
+        { "type": "url", "value": "https://onm-flx1.alea-soluciones.com:9199/onm/html/customer/" }
       ]
     }
   ]
