@@ -2767,6 +2767,7 @@ Flujos.registrar({
         <option value="derivaTecnicos">Se deriva a técnicos</option>
         <option value="ingenieria">Se deriva a ingeniería</option>
         <option value="sinProblema">No tiene problemas con el servicio</option>
+        <option value="ticket">Se crea ticket</option>
       </select>
 
       <!-- 🕓 Subbloques dinámicos -->
@@ -2809,6 +2810,12 @@ Flujos.registrar({
         <input id="telefonoDeriva" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. 612345678">
       </div>
 
+      <!-- 🆕 BLOQUE TICKET -->
+      <div id="bloqueTicket" style="display:none;margin-left:10px;">
+        <label><b>Número de ticket:</b></label><br>
+        <input id="numeroTicket" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. INC123456">
+      </div>
+
       <button id="generarBtn" style="
         width:100%;
         background:#007bff;
@@ -2843,12 +2850,13 @@ Flujos.registrar({
     const motivoOtro = contenedor.querySelector('#motivoOtro');
     const bloqueMotivoOtro = contenedor.querySelector('#bloqueMotivoOtro');
     const labelDescripcion = contenedor.querySelector('#labelDescripcion');
+    const bloqueTicket = contenedor.querySelector('#bloqueTicket');
+    const numeroTicket = contenedor.querySelector('#numeroTicket');
     const btn = contenedor.querySelector('#generarBtn');
 
     // --- Inicializar fecha por defecto ---
     const hoy = new Date();
-    const fechaHoy = hoy.toISOString().split('T')[0];
-    fechaCita.value = fechaHoy;
+    fechaCita.value = hoy.toISOString().split('T')[0];
 
     // --- Mostrar/ocultar según tipo gestión ---
     tipoGestion.addEventListener('change', () => {
@@ -2869,8 +2877,6 @@ Flujos.registrar({
         const nuevaOpcion = document.createElement('option');
         nuevaOpcion.value = 'noLocalizadoVarios';
         nuevaOpcion.textContent = 'Cierre incidencia, no localizado tras varios intentos';
-
-        // Insertar justo después de "No localizado"
         const opcionNoLocalizado = Array.from(resultado.options).find(opt => opt.value === 'noLocalizado');
         if (opcionNoLocalizado && opcionNoLocalizado.nextSibling) {
           resultado.insertBefore(nuevaOpcion, opcionNoLocalizado.nextSibling);
@@ -2880,7 +2886,6 @@ Flujos.registrar({
       } else if (tipo !== 'seguimiento' && existeOpcion) {
         const opcion = Array.from(resultado.options).find(opt => opt.value === 'noLocalizadoVarios');
         if (opcion) {
-          // Si estaba seleccionada, reiniciamos el valor
           if (resultado.value === 'noLocalizadoVarios') resultado.value = 'si';
           opcion.remove();
         }
@@ -2892,6 +2897,7 @@ Flujos.registrar({
       bloquePendiente.style.display = resultado.value === 'pendiente' ? 'block' : 'none';
       bloqueNoLocalizado.style.display = resultado.value === 'noLocalizado' ? 'block' : 'none';
       bloqueDeriva.style.display = resultado.value === 'derivaTecnicos' ? 'block' : 'none';
+      bloqueTicket.style.display = resultado.value === 'ticket' ? 'block' : 'none';
     });
 
     // --- Mostrar campos de cita ---
@@ -2930,23 +2936,18 @@ Flujos.registrar({
       }
 
       // --- Seguimiento ---
-        if (gestion === 'seguimiento') {
-            const info = infoAdicional.value.trim();
-            if (info) {
-                texto = `Seguimiento incidencia Internet. Información adicional: ${info}. `;
-            } else {
-                texto = `Seguimiento incidencia Internet. `;
-            }
-        }
-
-
+      if (gestion === 'seguimiento') {
+        const info = infoAdicional.value.trim();
+        texto = info
+          ? `Seguimiento incidencia Internet. Información adicional: ${info}. `
+          : `Seguimiento incidencia Internet. `;
+      }
 
       // --- Resultado final ---
       switch (resultado.value) {
         case 'si':
           texto += 'Se soluciona.';
           break;
-
         case 'pendiente':
           if (detallePendiente.value === 'seCita') {
             if (!horaCita.value) {
@@ -2959,15 +2960,12 @@ Flujos.registrar({
             texto += 'Pendiente comprobación: el cliente nos avisará cuando pueda.';
           }
           break;
-
         case 'noLocalizado':
           texto += whatsapp.checked ? 'No localizado, se envía WhatsApp.' : 'No localizado.';
           break;
-
         case 'noLocalizadoVarios':
           texto += 'Cierre incidencia: no localizado tras varios intentos.';
           break;
-
         case 'derivaTecnicos':
           const tel = telefonoDeriva.value.trim();
           if (!tel) {
@@ -2983,13 +2981,19 @@ Flujos.registrar({
             : motivoDeriva.value;
           texto += `Se deriva a técnicos. Motivo: ${motivo}. TC: ${tel}.`;
           break;
-
         case 'ingenieria':
           texto += 'Se deriva a ingeniería para revisión.';
           break;
-
         case 'sinProblema':
           texto += 'No se detectan problemas con el servicio.';
+          break;
+        case 'ticket':
+          const ticket = numeroTicket.value.trim();
+          if (!ticket) {
+            alert('⚠️ Debes indicar el número de ticket.');
+            return;
+          }
+          texto += `Se crea ticket ${ticket}.`;
           break;
       }
 
@@ -2997,6 +3001,7 @@ Flujos.registrar({
     });
   }
 });
+
 
 
 
@@ -3171,13 +3176,13 @@ Comprobacion de cableado: ${cableado}`;
 });
 
 /**************************************************************************
- * 📺 FLUJO: INCIDENCIA SERVICIO (TELEVISIÓN / ZAPI)
+ * 📺 FLUJO: INCIDENCIA SERVICIO (TELEVISIÓN)
  **************************************************************************/
 
 Flujos.registrar({
   id: 'incidenciaServicioTelevision',
   nombre: '📺 Incidencia servicio (Televisión)',
-  tipos: ['television', 'zapi'],
+  tipos: ['television'],
   render: (contenedor, pegarTexto) => {
     contenedor.innerHTML = `
       <h3>📺 Incidencia servicio (Televisión)</h3>
@@ -3705,6 +3710,457 @@ Flujos.registrar({
   }
 });
 
+/**************************************************************************
+ * 📺 FLUJO: INCIDENCIA SERVICIO (ZAPI)
+ **************************************************************************/
+
+Flujos.registrar({
+  id: 'incidenciaServicioZapi',
+  nombre: '📺 Incidencia servicio (ZAPI)',
+  tipos: ['zapi'],
+  render: (contenedor, pegarTexto) => {
+    contenedor.innerHTML = `
+      <h3>📺 Incidencia servicio (ZAPI)</h3>
+
+      <!-- Tipo de gestión -->
+      <label><b>Gestión:</b></label><br>
+      <select id="tipoGestion" style="width:100%;margin-bottom:10px;">
+        <option value="inicio">Inicio gestión</option>
+        <option value="seguimiento">Seguimiento</option>
+        <option value="derivada">Derivada (otro departamento)</option>
+      </select>
+
+      <!-- BLOQUE INICIO -->
+      <div id="bloqueInicio">
+        <label><b>Tecnología afectada:</b></label><br>
+        <label><input type="checkbox" class="tecnologia" value="STB"> STB</label><br>
+        <label><input type="checkbox" class="tecnologia" value="Web"> Web</label><br>
+        <label><input type="checkbox" class="tecnologia" value="App"> App</label><br><br>
+
+        <label><b>Descripción:</b></label><br>
+        <textarea id="descripcion" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Niveles / Equipos:</b></label><br>
+        <textarea id="niveles" rows="2" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Pruebas realizadas:</b></label><br>
+        <textarea id="pruebas" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+      </div>
+
+      <!-- BLOQUE SEGUIMIENTO -->
+      <div id="bloqueSeguimiento" style="display:none;">
+        <label><b>Información adicional (opcional):</b></label><br>
+        <textarea id="infoAdicional" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+      </div>
+
+      <!-- BLOQUE DERIVADA -->
+      <div id="bloqueDerivada" style="display:none;">
+        <label><b>Tecnología afectada:</b></label><br>
+        <label><input type="checkbox" class="tecnologiaDerivada" value="STB"> STB</label><br>
+        <label><input type="checkbox" class="tecnologiaDerivada" value="Web"> Web</label><br>
+        <label><input type="checkbox" class="tecnologiaDerivada" value="App"> App</label><br><br>
+
+        <label><b>Información adicional (opcional):</b></label><br>
+        <textarea id="infoAdicionalDerivada" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Niveles / Equipos:</b></label><br>
+        <textarea id="nivelesDerivada" rows="2" style="width:100%;margin-bottom:10px;"></textarea>
+
+        <label><b>Pruebas realizadas:</b></label><br>
+        <textarea id="pruebasDerivada" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+      </div>
+
+      <!-- RESULTADO -->
+      <label><b>¿Se soluciona la incidencia?</b></label><br>
+      <select id="resultado" style="width:100%;margin-bottom:10px;">
+        <option value="si">Sí</option>
+        <option value="pendiente">Pendiente comprobación</option>
+        <option value="noLocalizado">No localizado</option>
+        <option value="derivaTecnicos">Se deriva a técnicos</option>
+        <option value="ticket">Se crea ticket</option>
+        <option value="noProblema">No tiene problemas con el servicio</option>
+      </select>
+
+      <!-- SUBBLOQUES -->
+      <div id="bloquePendiente" style="display:none;margin-left:10px;">
+        <label><b>Detalle:</b></label><br>
+        <select id="detallePendiente" style="width:100%;margin-bottom:10px;">
+          <option value="seCita">Se cita</option>
+          <option value="avisara">Nos avisará cuando pueda</option>
+        </select>
+
+        <div id="bloqueCita" style="display:none;margin-left:10px;">
+          <label>📅 Fecha de cita:</label>
+          <input id="fechaCita" type="date" style="width:100%;margin-bottom:6px;">
+          <label>🕒 Hora de cita:</label>
+          <input id="horaCita" type="time" style="width:100%;margin-bottom:10px;">
+        </div>
+      </div>
+
+      <div id="bloqueNoLocalizado" style="display:none;margin-left:10px;">
+        <label><input type="checkbox" id="whatsapp"> Se envía WhatsApp</label><br>
+        <div id="cierreIntentos" style="display:none;margin-top:4px;">
+          <label><input type="checkbox" id="cierreNoLocalizado"> Cierre incidencia, no localizado tras varios intentos</label>
+        </div>
+      </div>
+
+      <div id="bloqueDerivaTecnicos" style="display:none;margin-left:10px;">
+        <label><b>Motivo de derivación:</b></label><br>
+        <select id="motivoDeriva" style="width:100%;margin-bottom:8px;">
+          <option value="Tras pruebas realizadas no se soluciona">Tras pruebas realizadas no se soluciona</option>
+          <option value="Cliente no colabora">Cliente no colabora</option>
+          <option value="Cliente no se aclara">Cliente no se aclara</option>
+          <option value="Problema físico">Problema físico</option>
+          <option value="Cliente exige visita técnica">Cliente exige visita técnica</option>
+          <option value="Otro">Otro</option>
+        </select>
+
+        <div id="bloqueMotivoOtro" style="display:none;">
+          <label><b>Especificar motivo:</b></label><br>
+          <input id="motivoOtro" type="text" style="width:100%;margin-bottom:8px;">
+        </div>
+
+        <label><b>Teléfono de contacto:</b></label><br>
+        <input id="telefonoDeriva" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. 612345678">
+      </div>
+
+      <div id="bloqueTicket" style="display:none;margin-left:10px;">
+        <label><b>Número de ticket (4 dígitos):</b></label><br>
+        <input id="numeroTicket" type="text" maxlength="4" style="width:100%;margin-bottom:10px;" placeholder="Ej. 1234">
+      </div>
+
+      <button id="generarBtn" style="
+        width:100%;
+        background:#007bff;
+        color:white;
+        border:none;
+        padding:8px;
+        border-radius:6px;
+        cursor:pointer;
+      ">📝 Generar resultado</button>
+    `;
+
+    // Referencias
+    const tipoGestion = contenedor.querySelector('#tipoGestion');
+    const bloqueInicio = contenedor.querySelector('#bloqueInicio');
+    const bloqueSeguimiento = contenedor.querySelector('#bloqueSeguimiento');
+    const bloqueDerivada = contenedor.querySelector('#bloqueDerivada');
+    const descripcion = contenedor.querySelector('#descripcion');
+    const niveles = contenedor.querySelector('#niveles');
+    const pruebas = contenedor.querySelector('#pruebas');
+    const infoAdicional = contenedor.querySelector('#infoAdicional');
+    const infoAdicionalDerivada = contenedor.querySelector('#infoAdicionalDerivada');
+    const nivelesDerivada = contenedor.querySelector('#nivelesDerivada');
+    const pruebasDerivada = contenedor.querySelector('#pruebasDerivada');
+    const resultado = contenedor.querySelector('#resultado');
+    const detallePendiente = contenedor.querySelector('#detallePendiente');
+    const bloquePendiente = contenedor.querySelector('#bloquePendiente');
+    const bloqueCita = contenedor.querySelector('#bloqueCita');
+    const fechaCita = contenedor.querySelector('#fechaCita');
+    const horaCita = contenedor.querySelector('#horaCita');
+    const bloqueNoLocalizado = contenedor.querySelector('#bloqueNoLocalizado');
+    const whatsapp = contenedor.querySelector('#whatsapp');
+    const cierreNoLocalizado = contenedor.querySelector('#cierreNoLocalizado');
+    const bloqueDerivaTecnicos = contenedor.querySelector('#bloqueDerivaTecnicos');
+    const motivoDeriva = contenedor.querySelector('#motivoDeriva');
+    const bloqueMotivoOtro = contenedor.querySelector('#bloqueMotivoOtro');
+    const motivoOtro = contenedor.querySelector('#motivoOtro');
+    const telefonoDeriva = contenedor.querySelector('#telefonoDeriva');
+    const bloqueTicket = contenedor.querySelector('#bloqueTicket');
+    const numeroTicket = contenedor.querySelector('#numeroTicket');
+    const btn = contenedor.querySelector('#generarBtn');
+
+    const hoy = new Date();
+    fechaCita.value = hoy.toISOString().split('T')[0];
+
+    tipoGestion.addEventListener('change', () => {
+      bloqueInicio.style.display = tipoGestion.value === 'inicio' ? 'block' : 'none';
+      bloqueSeguimiento.style.display = tipoGestion.value === 'seguimiento' ? 'block' : 'none';
+      bloqueDerivada.style.display = tipoGestion.value === 'derivada' ? 'block' : 'none';
+    });
+
+    resultado.addEventListener('change', () => {
+      bloquePendiente.style.display = resultado.value === 'pendiente' ? 'block' : 'none';
+      bloqueNoLocalizado.style.display = resultado.value === 'noLocalizado' ? 'block' : 'none';
+      bloqueDerivaTecnicos.style.display = resultado.value === 'derivaTecnicos' ? 'block' : 'none';
+      bloqueTicket.style.display = resultado.value === 'ticket' ? 'block' : 'none';
+    });
+
+    detallePendiente.addEventListener('change', () => {
+      bloqueCita.style.display = detallePendiente.value === 'seCita' ? 'block' : 'none';
+    });
+
+    motivoDeriva.addEventListener('change', () => {
+      bloqueMotivoOtro.style.display = motivoDeriva.value === 'Otro' ? 'block' : 'none';
+    });
+
+    btn.addEventListener('click', () => {
+      const gestion = tipoGestion.value;
+      let texto = '';
+
+      if (gestion === 'inicio') {
+        const tecnologias = Array.from(contenedor.querySelectorAll('.tecnologia:checked'))
+          .map(ch => ch.value)
+          .join(', ') || 'no indicada';
+        const desc = descripcion.value.trim();
+        const niv = niveles.value.trim();
+        const pru = pruebas.value.trim();
+        if (!desc || !pru) {
+          alert('⚠️ Debes completar descripción y pruebas realizadas.');
+          return;
+        }
+        texto = `Inicio gestión incidencia ZAPI. Tecnología afectada: ${tecnologias}. Descripción: ${desc}. Niveles/Equipos: ${niv || 'no indicado'}. Pruebas realizadas: ${pru}. `;
+      }
+
+      if (gestion === 'seguimiento') {
+        const info = infoAdicional.value.trim();
+        texto = info ? `Seguimiento incidencia ZAPI. Información adicional: ${info}. ` : `Seguimiento incidencia ZAPI. `;
+      }
+
+      if (gestion === 'derivada') {
+        const tecnologiasDer = Array.from(contenedor.querySelectorAll('.tecnologiaDerivada:checked'))
+          .map(ch => ch.value)
+          .join(', ') || 'no indicada';
+        const desc = infoAdicionalDerivada.value.trim();
+        const niv = nivelesDerivada.value.trim();
+        const pru = pruebasDerivada.value.trim();
+        texto = `Derivada desde otro departamento. Tecnología afectada: ${tecnologiasDer}. Información adicional: ${desc || 'sin detalles'}. Niveles/Equipos: ${niv || 'no indicado'}. Pruebas realizadas: ${pru || 'no indicadas'}. `;
+      }
+
+      switch (resultado.value) {
+        case 'si':
+          texto += 'Se soluciona.'; break;
+        case 'pendiente':
+          if (detallePendiente.value === 'seCita') {
+            if (!horaCita.value) { alert('⚠️ Debes indicar la hora de la cita.'); return; }
+            const [yyyy, mm, dd] = fechaCita.value.split('-');
+            texto += `Pendiente comprobación: se cita el ${dd}/${mm}/${yyyy} a las ${horaCita.value}.`;
+          } else texto += 'Pendiente comprobación: el cliente nos avisará cuando pueda.';
+          break;
+        case 'noLocalizado':
+          texto += whatsapp.checked ? 'No localizado, se envía WhatsApp.' : 'No localizado.';
+          if (cierreNoLocalizado.checked) texto += ' Cierre incidencia, no localizado tras varios intentos.';
+          break;
+        case 'derivaTecnicos':
+          const tel = telefonoDeriva.value.trim();
+          if (!tel) { alert('⚠️ Debes indicar un teléfono de contacto.'); return; }
+          if (motivoDeriva.value === 'Otro' && !motivoOtro.value.trim()) {
+            alert('⚠️ Debes especificar el motivo de derivación.'); return;
+          }
+          texto += `Se deriva a técnicos. Motivo: ${motivoDeriva.value === 'Otro' ? motivoOtro.value : motivoDeriva.value}. TC: ${tel}.`;
+          break;
+        case 'ticket':
+          const ticket = numeroTicket.value.trim();
+          if (!/^[0-9]{4}$/.test(ticket)) { alert('⚠️ El número de ticket debe tener 4 dígitos numéricos.'); return; }
+          texto += `Se crea ticket ${ticket} para seguimiento.`; break;
+        case 'noProblema':
+          texto += 'No tiene problemas con el servicio.'; break;
+      }
+
+      pegarTexto(texto.trim());
+    });
+  }
+});
+
+/**************************************************************************
+ * 🔑 FLUJO: GENERACIÓN CLAVES ZAPI
+ **************************************************************************/
+
+Flujos.registrar({
+  id: 'zapiGeneracionClaves',
+  nombre: '🔑 Generación claves',
+  tipos: ['zapi'],
+  render: (contenedor, pegarTexto) => {
+    contenedor.innerHTML = `
+      <h3>🔑 Generación de claves ZAPI</h3>
+      <p>Este flujo genera automáticamente el texto correspondiente.</p>
+      <button id="generarBtn" style="
+        width:100%;
+        background:#007bff;
+        color:white;
+        border:none;
+        padding:8px;
+        border-radius:6px;
+        cursor:pointer;
+      ">📝 Generar resultado</button>
+    `;
+
+    contenedor.querySelector('#generarBtn').addEventListener('click', () => {
+      pegarTexto('Se regeneran las credenciales de ZAPI.');
+    });
+  }
+});
+
+/**************************************************************************
+ * 📦 FLUJO: ASIGNACIÓN STB (ZAPI)
+ **************************************************************************/
+
+Flujos.registrar({
+  id: 'zapiAsignacionSTB',
+  nombre: '📦 Asignación STB',
+  tipos: ['zapi'],
+  render: (contenedor, pegarTexto) => {
+    contenedor.innerHTML = `
+      <h3>📦 Asignación de STB (ZAPI)</h3>
+
+      <label><b>Nº de serie:</b></label><br>
+      <input id="numSerie" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. ZAPI123456"><br>
+
+      <label><b>Solicitado por:</b></label><br>
+      <select id="solicitadoPor" style="width:100%;margin-bottom:10px;">
+        <option value="">Selecciona...</option>
+        <option value="Atención al cliente">Atención al cliente</option>
+        <option value="Grabación de contratos">Grabación de contratos</option>
+        <option value="Técnicos">Técnicos</option>
+        <option value="Otros">Otros</option>
+      </select>
+
+      <div id="bloqueOtros" style="display:none;">
+        <label><b>Especificar (obligatorio si se selecciona Otros):</b></label><br>
+        <textarea id="otrosTexto" rows="3" style="width:100%;margin-bottom:10px;" placeholder="Indica quién solicita la asignación"></textarea>
+      </div>
+
+      <button id="generarBtn" style="
+        width:100%;
+        background:#007bff;
+        color:white;
+        border:none;
+        padding:8px;
+        border-radius:6px;
+        cursor:pointer;
+      ">📝 Generar resultado</button>
+    `;
+
+    const numSerie = contenedor.querySelector('#numSerie');
+    const solicitadoPor = contenedor.querySelector('#solicitadoPor');
+    const bloqueOtros = contenedor.querySelector('#bloqueOtros');
+    const otrosTexto = contenedor.querySelector('#otrosTexto');
+    const btn = contenedor.querySelector('#generarBtn');
+
+    // Mostrar/ocultar campo “Otros”
+    solicitadoPor.addEventListener('change', () => {
+      bloqueOtros.style.display = solicitadoPor.value === 'Otros' ? 'block' : 'none';
+    });
+
+    // Generar resultado
+    btn.addEventListener('click', () => {
+      if (!numSerie.value.trim()) {
+        alert('⚠️ Debes indicar el número de serie.');
+        return;
+      }
+      if (!solicitadoPor.value) {
+        alert('⚠️ Debes seleccionar quién solicita la asignación.');
+        return;
+      }
+      if (solicitadoPor.value === 'Otros' && !otrosTexto.value.trim()) {
+        alert('⚠️ Debes especificar quién solicita la asignación.');
+        return;
+      }
+
+      let texto = `Asignación de STB ZAPI. Nº de serie: ${numSerie.value.trim()}. Solicitado por: ${solicitadoPor.value}`;
+      if (solicitadoPor.value === 'Otros') texto += ` (${otrosTexto.value.trim()})`;
+      texto += '.';
+
+      pegarTexto(texto);
+    });
+  }
+});
+
+/**************************************************************************
+ * 🆕 FLUJO: ALTA SUSCRIPTOR (ZAPI)
+ **************************************************************************/
+
+Flujos.registrar({
+  id: 'zapiAltaSuscriptor',
+  nombre: '🆕 Alta suscriptor',
+  tipos: ['zapi'],
+  render: (contenedor, pegarTexto) => {
+    contenedor.innerHTML = `
+      <h3>🆕 Alta de suscriptor ZAPI</h3>
+
+      <label><b>Solicitado por:</b></label><br>
+      <select id="solicitadoPor" style="width:100%;margin-bottom:10px;">
+        <option value="">Selecciona...</option>
+        <option value="Atención al cliente">Atención al cliente</option>
+        <option value="Grabación de contratos">Grabación de contratos</option>
+        <option value="Técnicos">Técnicos</option>
+        <option value="Otros">Otros</option>
+      </select>
+
+      <div id="bloqueOtros" style="display:none;">
+        <label><b>Especificar (obligatorio si se selecciona Otros):</b></label><br>
+        <textarea id="otrosTexto" rows="3" style="width:100%;margin-bottom:10px;" placeholder="Indica quién solicita el alta"></textarea>
+      </div>
+
+      <label><b>¿Se asigna STB?</b></label><br>
+      <select id="asignaSTB" style="width:100%;margin-bottom:10px;">
+        <option value="no" selected>No</option>
+        <option value="si">Sí</option>
+      </select>
+
+      <div id="bloqueSTB" style="display:none;margin-left:10px;">
+        <label><b>Nº de serie:</b></label><br>
+        <input id="numSerie" type="text" style="width:100%;margin-bottom:10px;" placeholder="Ej. ZAPI123456">
+      </div>
+
+      <button id="generarBtn" style="
+        width:100%;
+        background:#007bff;
+        color:white;
+        border:none;
+        padding:8px;
+        border-radius:6px;
+        cursor:pointer;
+      ">📝 Generar resultado</button>
+    `;
+
+    const solicitadoPor = contenedor.querySelector('#solicitadoPor');
+    const bloqueOtros = contenedor.querySelector('#bloqueOtros');
+    const otrosTexto = contenedor.querySelector('#otrosTexto');
+    const asignaSTB = contenedor.querySelector('#asignaSTB');
+    const bloqueSTB = contenedor.querySelector('#bloqueSTB');
+    const numSerie = contenedor.querySelector('#numSerie');
+    const btn = contenedor.querySelector('#generarBtn');
+
+    // Mostrar/ocultar campo “Otros”
+    solicitadoPor.addEventListener('change', () => {
+      bloqueOtros.style.display = solicitadoPor.value === 'Otros' ? 'block' : 'none';
+    });
+
+    // Mostrar/ocultar campo STB
+    asignaSTB.addEventListener('change', () => {
+      bloqueSTB.style.display = asignaSTB.value === 'si' ? 'block' : 'none';
+    });
+
+    // Generar resultado
+    btn.addEventListener('click', () => {
+      if (!solicitadoPor.value) {
+        alert('⚠️ Debes seleccionar quién solicita el alta.');
+        return;
+      }
+      if (solicitadoPor.value === 'Otros' && !otrosTexto.value.trim()) {
+        alert('⚠️ Debes especificar quién solicita el alta.');
+        return;
+      }
+
+      let texto = `Alta de suscriptor ZAPI. Solicitado por: ${solicitadoPor.value}`;
+      if (solicitadoPor.value === 'Otros') texto += ` (${otrosTexto.value.trim()})`;
+      texto += '. ';
+
+      if (asignaSTB.value === 'si') {
+        if (!numSerie.value.trim()) {
+          alert('⚠️ Debes indicar el número de serie del STB.');
+          return;
+        }
+        texto += `Se asigna STB con Nº de serie: ${numSerie.value.trim()}.`;
+      } else {
+        texto += 'No se asigna STB.';
+      }
+
+      pegarTexto(texto.trim());
+    });
+  }
+});
 
 
 /**************************************************************************
