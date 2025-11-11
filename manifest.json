@@ -1,5 +1,5 @@
 {
-  "version": "2025-11-11-06",
+  "version": "2025-11-11-07",
   "scripts": [
     {
       "file": "x82c9e4a.js",
@@ -64,7 +64,7 @@
       ]
     },
     {
-      "file": "d6f5x8d5.js",
+      "file": "7g3h8y6k.js",
       "match": [
         { "type": "url", "value": "https://tca-pha1.alea-soluciones.com:9191/cacti/graph.php?" },
         { "type": "url", "value": "https://ona-xem1.alea-soluciones.com:9191/cacti/graph.php?" },
