@@ -1,6 +1,7 @@
 (function () {
   'use strict';
 
+  // --- Utilidades base ---
   const norm = s => (s || '').toString().replace(/\s+/g, ' ').trim();
 
   function showBanner(msg, color = '#16a34a') {
@@ -79,19 +80,14 @@
 
   function extractNiveles(modal) {
     const error = modal.querySelector('[role="alert"]');
-    if (error) {
-      return 'Error al obtener el estado (ont sin señal).';
-    }
+    if (error) return 'Error al obtener el estado (ont sin señal).';
 
     const text = modal.textContent;
     const dnrx = text.match(/dnrx:\s*([-\d.]+dBm)/i)?.[1];
     const uprx = text.match(/uprx:\s*([-\d.]+dBm)/i)?.[1];
 
-    if (dnrx && uprx) {
-      return `uprx: ${uprx} / dnrx: ${dnrx}.`;
-    }
-
-    return null; // aún no cargó o estructura distinta
+    if (dnrx && uprx) return `uprx: ${uprx} / dnrx: ${dnrx}.`;
+    return null;
   }
 
   function insertCopyButton(modal) {
@@ -109,22 +105,59 @@
       showBanner(ok ? '✅ Copiado' : '⚠️ No se pudo copiar', ok ? '#16a34a' : '#dc2626');
     });
 
-    // insertar al final del bloque principal
     const content = modal.querySelector('.p-6.space-y-6.flex-1');
     if (content) content.appendChild(btn);
   }
 
-  // Observa la aparición de los modales de estado
-  const observer = new MutationObserver(() => {
-    const modals = document.querySelectorAll('.flex.relative.max-w-4xl.w-full.max-h-full');
-    modals.forEach(modal => {
-      const text = modal.textContent || '';
-      // solo insertar si hay datos cargados o error
-      if (/dnrx:/i.test(text) || /Error al obtener el estado/i.test(text)) {
-        insertCopyButton(modal);
-      }
+  function startModalWatcher() {
+    // Observa aparición de modales con niveles o errores
+    const observer = new MutationObserver(() => {
+      const modals = document.querySelectorAll('.flex.relative.max-w-4xl.w-full.max-h-full');
+      modals.forEach(modal => {
+        const text = modal.textContent || '';
+        if (/dnrx:/i.test(text) || /Error al obtener el estado/i.test(text)) {
+          insertCopyButton(modal);
+        }
+      });
     });
-  });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
 
-  observer.observe(document.body, { childList: true, subtree: true });
+  // --- Detectar SPA navigation (pushState / replaceState / popstate) ---
+  function hookSpaNavigation(callback) {
+    const pushState = history.pushState;
+    const replaceState = history.replaceState;
+    const trigger = () => setTimeout(callback, 400);
+
+    history.pushState = function (...args) {
+      pushState.apply(this, args);
+      trigger();
+    };
+    history.replaceState = function (...args) {
+      replaceState.apply(this, args);
+      trigger();
+    };
+    window.addEventListener('popstate', trigger);
+  }
+
+  // --- Esperar que la vista /productos haya cargado ---
+  async function waitForProductosTable() {
+    for (let i = 0; i < 30; i++) {
+      const tbl = document.querySelector('table.w-full.text-left.text-sm.text-gray-500');
+      if (tbl) return true;
+      await new Promise(r => setTimeout(r, 300));
+    }
+    return false;
+  }
+
+  // --- Activar lógica solo en /productos ---
+  async function handleRouteChange() {
+    if (!location.pathname.includes('/productos')) return;
+
+    const ready = await waitForProductosTable();
+    if (ready) startModalWatcher();
+  }
+
+  hookSpaNavigation(handleRouteChange);
+  handleRouteChange(); // ejecución inicial
 })();
