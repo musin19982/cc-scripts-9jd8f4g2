@@ -1,5 +1,5 @@
 {
-  "version": "2025-11-11-05",
+  "version": "2025-11-11-06",
   "scripts": [
     {
       "file": "x82c9e4a.js",
@@ -60,7 +60,7 @@
     {
       "file": "6f2c5d3c.js",
       "match": [
-        { "type": "url", "value": "https://mayorista-olingroup.doruscom.com/productos" }
+        { "type": "url", "value": "https://mayorista-olingroup.doruscom.com/" }
       ]
     },
     {
