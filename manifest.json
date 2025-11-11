@@ -1,5 +1,5 @@
 {
-  "version": "2025-11-11-01",
+  "version": "2025-11-11-02",
   "scripts": [
     {
       "file": "x82c9e4a.js",
@@ -55,6 +55,22 @@
       "file": "u8f7ehd8.js",
       "match": [
         { "type": "url", "value": "https://onm-flx1.alea-soluciones.com:9199/onm/html/customer/" }
+      ]
+    },
+    {
+      "file": "6f2c5d3c.js",
+      "match": [
+        { "type": "url", "value": "https://mayorista-olingroup.doruscom.com/productos" }
+      ]
+    },
+    {
+      "file": "d6f5x8d5.js",
+      "match": [
+        { "type": "url", "value": "https://tca-pha1.alea-soluciones.com:9191/cacti/graph.php?" },
+        { "type": "url", "value": "https://ona-xem1.alea-soluciones.com:9191/cacti/graph.php?" },
+        { "type": "url", "value": "https://onm-pha1.alea-soluciones.com:9191/cacti/graph.php?" },
+        { "type": "url", "value": "https://onr-pha1.alea-soluciones.com:9191/cacti/graph.php?" },
+        { "type": "url", "value": "https://onp-pha1.alea-soluciones.com:9191/cacti/graph.php?" }
       ]
     }
   ]
