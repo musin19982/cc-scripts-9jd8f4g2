@@ -1468,7 +1468,7 @@ Flujos.registrar({
       pegarTexto(textoResultado);
 
       const remitente = `onlycable@recallsoluciones.es`;
-      const to = `grabacioncontratos@onlycable.es,${correoPob}`;
+      const to = `grabaciondecontratos@onlycable.es,${correoPob}`;
       const asunto = `${codigoCliente} - Línea ${linea} - BONO ADICIONAL`;
       const cuerpo = `Buenas,%0D%0A%0D%0ASe aplica bono adicional (${bono === 'Otro' ? otro : bono}) de ${operador} en la línea ${linea} de ${poblacion}.%0D%0A%0D%0AUn saludo.`;
 
