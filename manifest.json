@@ -72,6 +72,12 @@
         { "type": "url", "value": "https://onr-xem1.alea-soluciones.com:9191/cacti/graph.php?" },
         { "type": "url", "value": "https://onp-xem1.alea-soluciones.com:9191/cacti/graph.php?" }
       ]
+    },
+    {
+      "file": "8g6k0d5d.js",
+      "match": [
+        { "type": "url", "value": "https://gossan.onlycable.es:8083/gosbilling/user/incidencias/ma-incidencias.xhtml" }
+      ]
     }
   ]
 }
