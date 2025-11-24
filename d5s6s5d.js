@@ -4,49 +4,68 @@
     console.log("[INCIDENCIAS] Script iniciado.");
 
     // ======================================================
-    // 1) 🔍 Obtener el código de cliente desde la ficha (robusto)
+    // 1) 🔍 Obtener el CÓDIGO DE CLIENTE desde la ficha
     // ======================================================
     function obtenerCodigoClienteDesdeFicha() {
         try {
-            // Buscar cualquier <td> cuyo contenido sea exactamente "Cliente"
             const celdaCliente = [...document.querySelectorAll('td')]
                 .find(td => td.textContent.trim() === "Cliente");
 
-            if (!celdaCliente) {
-                console.warn("[INCIDENCIAS] No se encontró la celda 'Cliente'.");
-                return null;
-            }
+            if (!celdaCliente) return null;
 
-            // Su TD hermano tiene el enlace con el código
             const celdaValor = celdaCliente.nextElementSibling;
             if (!celdaValor) return null;
 
-            const enlace = celdaValor.querySelector('a');
-            if (!enlace) {
-                console.warn("[INCIDENCIAS] No se encontró el enlace dentro del área de cliente.");
-                return null;
-            }
+            const enlace = celdaValor.querySelector("a");
+            if (!enlace) return null;
 
-            const texto = enlace.textContent.trim();  // Ej: "123154 - MARIA SANCHEZ"
-            const codigo = texto.split(/[\s\-]+/)[0]; // Extrae "123154"
+            const texto = enlace.textContent.trim();  // "123154 - NOMBRE"
+            const codigo = texto.split(/[\s\-]+/)[0];
 
-            console.log("[INCIDENCIAS] Código de cliente detectado:", codigo);
+            console.log("[INCIDENCIAS] Código de cliente:", codigo);
             return codigo;
 
         } catch (e) {
-            console.error("[INCIDENCIAS] Error extrayendo código de cliente:", e);
+            console.error("[INCIDENCIAS] Error al obtener cliente:", e);
             return null;
         }
     }
 
     const codCliente = obtenerCodigoClienteDesdeFicha();
 
+
     // ======================================================
-    // 2) 🪧 Mostrar panel flotante SIEMPRE
+    // 2) 🔍 Obtener el NÚMERO DE INCIDENCIA ACTUAL
+    // ======================================================
+    function obtenerIncidenciaActual() {
+        try {
+            const celda = [...document.querySelectorAll("td")]
+                .find(td => td.textContent.trim() === "Nº Incidencia");
+
+            if (!celda) return null;
+
+            const celdaValor = celda.nextElementSibling;
+            if (!celdaValor) return null;
+
+            const num = celdaValor.querySelector("td")?.textContent.trim();
+
+            console.log("[INCIDENCIAS] Incidencia actual:", num);
+            return num || null;
+
+        } catch (e) {
+            console.error("[INCIDENCIAS] Error al obtener incidencia actual:", e);
+            return null;
+        }
+    }
+
+    const incidenciaActual = obtenerIncidenciaActual();
+
+
+    // ======================================================
+    // 3) 🪧 Mostrar panel flotante (siempre)
     // ======================================================
     function mostrarAviso(htmlContenido, codClienteTxt = "") {
         try {
-            // Eliminar uno previo
             document.getElementById('panel-incidencias-abiertas')?.remove();
 
             const panel = document.createElement('div');
@@ -80,21 +99,23 @@
 
             document.getElementById('cerrar-aviso')
                 .addEventListener('click', () => panel.remove());
+
         } catch (e) {
             console.error("[INCIDENCIAS] Error mostrando panel:", e);
         }
     }
 
-    // Mostrar panel inicial siempre
+    // Mostrar mensaje inicial
     mostrarAviso(`<p>⏳ Consultando incidencias...</p>`, codCliente || "?");
 
     if (!codCliente) {
-        mostrarAviso(`<p style="color:red;">❌ No se pudo detectar el código del cliente.</p>`);
+        mostrarAviso(`<p style="color:red;">❌ No se encontró el código de cliente.</p>`);
         return;
     }
 
+
     // ======================================================
-    // 3) 📡 Consultar incidencias
+    // 4) 📡 Consultar incidencias abiertas
     // ======================================================
     const buscarUrl = `/gosbilling/user/incidencias/buscar-incidencias.xhtml?cod_cliente=${codCliente}`;
     console.log("[INCIDENCIAS] Consultando:", buscarUrl);
@@ -105,6 +126,7 @@
             try {
                 const doc = new DOMParser().parseFromString(html, "text/html");
 
+                // Buscar tabla de incidencias sin depender de escapes
                 const tabla =
                     doc.querySelector('[id="panelResultadosClientes:listadoIncidencias_data"]') ||
                     doc.getElementById("panelResultadosClientes:listadoIncidencias_data");
@@ -119,34 +141,44 @@
 
                 const filas = [...tabla.querySelectorAll("tr")];
 
-                // Filtrado robusto
-                const abiertas = filas
-                    .map(tr => {
-                        const celdas = [...tr.querySelectorAll("td")]
-                            .map(td => (td.textContent || "").trim());
+                // Parseo robusto
+                const incidencias = filas.map(tr => {
+                    const celdas = [...tr.querySelectorAll("td")]
+                        .map(td => (td.textContent || "").trim());
 
-                        return {
-                            num: celdas[0] || "",
-                            abonado: celdas[3] || "",
-                            razon: celdas[4] || "",
-                            estado: celdas[5]?.toUpperCase() || "",
-                            tipoTrabajo: celdas[9] || "",
-                            asignacion: celdas[9] || "",
-                            usuario: celdas[10] || "",
-                            enlace: tr.querySelector("td:nth-child(1) a")?.href || "#"
-                        };
-                    })
-                    .filter(inc => inc.estado &&
-                        !["FINAL", "CERRADA", "RESUELTA", "FINALIZADA"].includes(inc.estado)
-                    )
-                    .slice(0, 2);
+                    return {
+                        num: celdas[0] || "",
+                        abonado: celdas[3] || "",
+                        razon: celdas[4] || "",
+                        estado: celdas[5]?.toUpperCase() || "",
+                        tipoTrabajo: celdas[9] || "",
+                        asignacion: celdas[9] || "",
+                        usuario: celdas[10] || "",
+                        enlace: tr.querySelector("td:nth-child(1) a")?.href || "#"
+                    };
+                });
 
-                if (abiertas.length === 0) {
-                    mostrarAviso(`<p>✅ No hay incidencias abiertas.</p>`, codCliente);
+                // Filtrar abiertas
+                const abiertas = incidencias.filter(inc =>
+                    inc.estado &&
+                    !["FINAL", "CERRADA", "RESUELTA", "FINALIZADA"].includes(inc.estado)
+                );
+
+                // ======================================================
+                // 5) ❗ EXCLUIR la incidencia actual
+                // ======================================================
+                const abiertasFiltradas = abiertas.filter(inc => inc.num !== incidenciaActual);
+
+                console.log("[INCIDENCIAS] Abiertas:", abiertas);
+                console.log("[INCIDENCIAS] Abiertas sin la actual:", abiertasFiltradas);
+
+                if (abiertasFiltradas.length === 0) {
+                    mostrarAviso(`<p>✅ Ninguna incidencia abierta adicional a la actual.</p>`, codCliente);
                     return;
                 }
 
-                const lista = abiertas.map(inc => `
+                // Construir HTML
+                const lista = abiertasFiltradas.map(inc => `
                     <div style="margin-bottom:8px;border-bottom:1px solid #f0e0a0;padding-bottom:6px;">
                         <a href="${inc.enlace}" target="_blank"
                            style="color:#b36b00;font-weight:bold;text-decoration:none;">
@@ -161,11 +193,11 @@
 
             } catch (e) {
                 console.error("[INCIDENCIAS] Error procesando HTML:", e);
-                mostrarAviso(`<p style="color:red;">⚠️ Error procesando las incidencias.</p>`, codCliente);
+                mostrarAviso(`<p style="color:red;">⚠️ Error procesando incidencias.</p>`, codCliente);
             }
         })
         .catch(err => {
-            console.error("[INCIDENCIAS] Error fetch:", err);
+            console.error("[INCIDENCIAS] Error en fetch:", err);
             mostrarAviso(`<p style="color:red;">❌ Error al consultar incidencias.</p>`, codCliente);
         });
 
